@@ -1,0 +1,6 @@
+const Printf = func printf(format: &u8): i32;
+
+const Main = func main(): i32 {
+    Printf("Hello, world!");
+    return 0;
+};

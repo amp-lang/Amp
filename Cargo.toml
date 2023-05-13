@@ -1,0 +1,13 @@
+[package]
+name = "ampc"
+version = "0.4.0-alpha"
+edition = "2021"
+
+[lib]
+[[bin]]
+name = "ampc"
+
+[dependencies]
+codespan-reporting = { path = "./codespan-reporting" }
+slot-arena = "0.1.0"
+unicode-xid = "0.2.4"
