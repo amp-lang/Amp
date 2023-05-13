@@ -159,6 +159,16 @@ impl<'cx, 'src> Scanner<'cx, 'src> {
         while let Some(token) = self.peek_char() {
             if token.is_whitespace() {
                 self.next_char();
+            } else if token == '/'
+                && self.peek_nth_char(1) == Some('/')
+                // don't skip doc comments
+                && self.peek_nth_char(2) != Some('/')
+            {
+                while let Some(char) = self.next_char() {
+                    if char == '\n' {
+                        break;
+                    }
+                }
             } else {
                 break;
             }
