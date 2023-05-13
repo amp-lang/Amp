@@ -74,11 +74,10 @@ impl Context {
             primary_label_warning: green.clone(),
             primary_label_help: green.clone(),
             primary_label_note: green.clone(),
+            secondary_label: green.clone(),
             line_number: cyan.clone(),
             source_border: cyan.clone(),
             note_bullet: cyan.clone(),
-            // use the default for secondary labels as they are never used
-            ..Default::default()
         };
 
         Config {

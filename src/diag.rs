@@ -67,6 +67,11 @@ pub trait Report {
 
 /// A trait which allows
 pub trait SyntaxDiagnostics: Report {
+    /// Reports that an invalid character was found during tokenization.
+    ///
+    /// # Params
+    /// 1. The invalid character which was found.
+    /// 2. The location where the invalid character was found.
     fn invalid_character(&mut self, offending_char: char, offending_span: Span) {
         self.report(Diag::new().error(
             format!(
@@ -75,6 +80,14 @@ pub trait SyntaxDiagnostics: Report {
             ),
             Some(offending_span),
         ))
+    }
+
+    /// Reports that an unterminated string was found during tokenization.
+    ///
+    /// # Params
+    /// 1. The location of the unterminated string.
+    fn unterminated_string(&mut self, offending_span: Span) {
+        self.report(Diag::new().error("unterminated string", Some(offending_span)));
     }
 }
 

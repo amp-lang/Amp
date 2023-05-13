@@ -51,6 +51,21 @@ pub enum Token {
 
     /// A Unicode XID identifier token.
     Id,
+
+    /// A string token.
+    ///
+    /// ```amp
+    /// "Hello, world!"
+    /// ```
+    Str,
+
+    /// A decimal integer.
+    ///
+    /// ```amp
+    /// 12345678
+    /// 1234_5678
+    /// ```
+    DecInt,
 }
 
 /// The state of the lexical scanner.
@@ -124,8 +139,15 @@ impl<'cx, 'src> Scanner<'cx, 'src> {
 
     /// Returns `true` if the provided character can continue an identifier token after it is
     /// started.
+    #[inline]
     fn is_id_continue(char: char) -> bool {
         char.is_xid_continue()
+    }
+
+    /// Returns `true` if the provided character is a decimal digit.
+    #[inline]
+    fn is_digit(char: char) -> bool {
+        char >= '0' && char <= '9'
     }
 
     /// Skips all skippable tokens (whitespace, comments) until a non-skippable character is found.
@@ -161,6 +183,42 @@ impl<'cx, 'src> Scanner<'cx, 'src> {
             _ => Token::Id,
         }
     }
+
+    /// Scans a single string token.  Assumes a starting quote (`"`) has found and iterated past.
+    ///
+    /// TODO: scan escape codes
+    fn scan_str(&mut self) -> Token {
+        while let Some(char) = self.peek_char() {
+            if char == '"' {
+                break;
+            }
+
+            self.next_char();
+        }
+
+        if self.next_char() != Some('"') {
+            self.cx.unterminated_string(self.span());
+            return Token::Invalid;
+        }
+
+        Token::Str
+    }
+
+    /// Scans a single number token.  Assumes that a valid starting digit was found but not
+    /// iterated past.
+    ///
+    /// TODO: non-decimal integers, floats.
+    fn scan_num(&mut self) -> Token {
+        while let Some(digit) = self.peek_char() {
+            if !Self::is_digit(digit) && digit != '_' {
+                break;
+            }
+
+            self.next_char();
+        }
+
+        Token::DecInt
+    }
 }
 
 impl<'cx, 'src> Iterator for Scanner<'cx, 'src> {
@@ -173,7 +231,13 @@ impl<'cx, 'src> Iterator for Scanner<'cx, 'src> {
         let first_char = self.peek_char()?;
 
         if Self::is_id_start(first_char) {
+            self.next_char(); // skip first character for optimization purposes
             return Some(self.scan_id());
+        } else if first_char == '"' {
+            self.next_char();
+            return Some(self.scan_str());
+        } else if Self::is_digit(first_char) {
+            return Some(self.scan_num());
         }
 
         self.next_char();
@@ -190,7 +254,7 @@ impl<'cx, 'src> Iterator for Scanner<'cx, 'src> {
             _ => {
                 // None of the previous checks matched any tokens supported by Amp, so we can assume that
                 // the character was invalid.
-                self.cx.invalid_character(first_char, self.span);
+                self.cx.invalid_character(first_char, self.span());
 
                 Token::Invalid
             }
