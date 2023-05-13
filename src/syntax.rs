@@ -13,6 +13,33 @@ pub enum Token {
     /// encountered, the [Scanner] has already outputted a diagnostic for it.
     Invalid,
 
+    /// `&`
+    And,
+
+    /// `:`
+    Colon,
+
+    /// `,`
+    Comma,
+
+    /// `=`
+    Eq,
+
+    /// `;`
+    Semi,
+
+    /// `(`
+    ParenOpen,
+
+    /// `)`
+    ParenClose,
+
+    /// `{`
+    BraceOpen,
+
+    /// `}`
+    BraceClose,
+
     /// `const`
     KConst,
 
@@ -149,11 +176,24 @@ impl<'cx, 'src> Iterator for Scanner<'cx, 'src> {
             return Some(self.scan_id());
         }
 
-        // None of the previous checks matched any tokens supported by Amp, so we can assume that
-        // the character was invalid.
         self.next_char();
-        self.cx.invalid_character(first_char, self.span);
+        Some(match first_char {
+            '&' => Token::And,
+            ':' => Token::Colon,
+            ',' => Token::Comma,
+            '=' => Token::Eq,
+            ';' => Token::Semi,
+            '(' => Token::ParenOpen,
+            ')' => Token::ParenClose,
+            '{' => Token::BraceClose,
+            '}' => Token::BraceClose,
+            _ => {
+                // None of the previous checks matched any tokens supported by Amp, so we can assume that
+                // the character was invalid.
+                self.cx.invalid_character(first_char, self.span);
 
-        Some(Token::Invalid)
+                Token::Invalid
+            }
+        })
     }
 }
