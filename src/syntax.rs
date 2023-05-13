@@ -13,6 +13,15 @@ pub enum Token {
     /// encountered, the [Scanner] has already outputted a diagnostic for it.
     Invalid,
 
+    /// `const`
+    KConst,
+
+    /// `func`
+    KFunc,
+
+    /// `return`
+    KReturn,
+
     /// A Unicode XID identifier token.
     Id,
 }
@@ -109,8 +118,6 @@ impl<'cx, 'src> Scanner<'cx, 'src> {
 
     /// Scans a single identifier token.  Assumes a valid identifier starting character has been
     /// found.
-    ///
-    /// TODO: match keyword tokens
     fn scan_id(&mut self) -> Token {
         while let Some(next_char) = self.peek_char() {
             if !Self::is_id_continue(next_char) {
@@ -120,7 +127,12 @@ impl<'cx, 'src> Scanner<'cx, 'src> {
             self.next_char();
         }
 
-        Token::Id
+        match self.slice() {
+            "const" => Token::KConst,
+            "func" => Token::KFunc,
+            "return" => Token::KReturn,
+            _ => Token::Id,
+        }
     }
 }
 
