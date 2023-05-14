@@ -1,4 +1,7 @@
-use ampc::{syntax::Scanner, Context};
+use ampc::{
+    syntax::{self},
+    Context,
+};
 
 fn main() {
     let mut cx = Context::new();
@@ -8,16 +11,9 @@ fn main() {
     );
 
     let source = cx.files().get(file_id).unwrap().source().to_owned();
-    let mut scanner = Scanner::new(&mut cx, file_id, &source);
-
-    while let Some(token) = scanner.next() {
-        println!(
-            "{:?}: '{}' @ {:?}",
-            token,
-            scanner.slice().escape_debug(),
-            scanner.span()
-        )
-    }
+    let tokens = syntax::scan(&mut cx, file_id, &source);
 
     cx.emit().unwrap();
+
+    println!("{:#?}", tokens);
 }

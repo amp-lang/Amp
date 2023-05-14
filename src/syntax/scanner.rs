@@ -1,4 +1,4 @@
-//! The scanner, parser and abstract syntax trees for Amp.
+//! Amp's lexical scanner.
 
 use std::str::Chars;
 
@@ -70,7 +70,7 @@ pub enum Token {
 
 /// The state of the lexical scanner.
 pub struct Scanner<'cx, 'src> {
-    cx: &'cx mut Context,
+    pub(crate) cx: &'cx mut Context,
 
     /// The span of the current token.
     span: Span,
@@ -103,6 +103,19 @@ impl<'cx, 'src> Scanner<'cx, 'src> {
     #[inline]
     pub fn slice(&self) -> &'src str {
         &self.src[self.span.start()..self.span.end()]
+    }
+
+    /// Returns the next token.
+    pub fn peek(&mut self) -> Option<Token> {
+        let init_span = self.span;
+        let init_chars = self.chars.clone();
+
+        let token = self.next::<false>();
+
+        self.span = init_span;
+        self.chars = init_chars;
+
+        token
     }
 
     /// Returns the next character in the source string.  Moves the end of the current span to the
@@ -197,7 +210,7 @@ impl<'cx, 'src> Scanner<'cx, 'src> {
     /// Scans a single string token.  Assumes a starting quote (`"`) has found and iterated past.
     ///
     /// TODO: scan escape codes
-    fn scan_str(&mut self) -> Token {
+    fn scan_str<const REPORT: bool>(&mut self) -> Token {
         while let Some(char) = self.peek_char() {
             if char == '"' {
                 break;
@@ -207,7 +220,9 @@ impl<'cx, 'src> Scanner<'cx, 'src> {
         }
 
         if self.next_char() != Some('"') {
-            self.cx.unterminated_string(self.span());
+            if REPORT {
+                self.cx.unterminated_string(self.span());
+            }
             return Token::Invalid;
         }
 
@@ -229,12 +244,9 @@ impl<'cx, 'src> Scanner<'cx, 'src> {
 
         Token::DecInt
     }
-}
 
-impl<'cx, 'src> Iterator for Scanner<'cx, 'src> {
-    type Item = Token;
-
-    fn next(&mut self) -> Option<Self::Item> {
+    /// Returns the next token in the scanner.
+    pub(crate) fn next<const REPORT: bool>(&mut self) -> Option<Token> {
         self.skip();
         self.next_span();
 
@@ -245,7 +257,7 @@ impl<'cx, 'src> Iterator for Scanner<'cx, 'src> {
             return Some(self.scan_id());
         } else if first_char == '"' {
             self.next_char();
-            return Some(self.scan_str());
+            return Some(self.scan_str::<REPORT>());
         } else if Self::is_digit(first_char) {
             return Some(self.scan_num());
         }
@@ -259,15 +271,25 @@ impl<'cx, 'src> Iterator for Scanner<'cx, 'src> {
             ';' => Token::Semi,
             '(' => Token::ParenOpen,
             ')' => Token::ParenClose,
-            '{' => Token::BraceClose,
+            '{' => Token::BraceOpen,
             '}' => Token::BraceClose,
             _ => {
                 // None of the previous checks matched any tokens supported by Amp, so we can assume that
                 // the character was invalid.
-                self.cx.invalid_character(first_char, self.span());
+                if REPORT {
+                    self.cx.invalid_character(first_char, self.span());
+                }
 
                 Token::Invalid
             }
         })
+    }
+}
+
+impl<'cx, 'src> Iterator for Scanner<'cx, 'src> {
+    type Item = Token;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next::<true>()
     }
 }

@@ -45,3 +45,9 @@ impl From<Span> for std::ops::Range<usize> {
         span.start()..span.end()
     }
 }
+
+/// A trait for objects with a [Span].
+pub trait Spanned {
+    /// Returns the [Span] of this object.
+    fn span(&self) -> Span;
+}

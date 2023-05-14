@@ -89,6 +89,25 @@ pub trait SyntaxDiagnostics: Report {
     fn unterminated_string(&mut self, offending_span: Span) {
         self.report(Diag::new().error("unterminated string", Some(offending_span)));
     }
+
+    /// Reports that an unclosed delimiter was found.
+    ///
+    /// # Params
+    /// 1. The span of the unclosed delimiter.
+    fn unclosed_delimiter(&mut self, offending_span: Span) {
+        self.report(Diag::new().error("unclosed delimiter", Some(offending_span)));
+    }
+
+    /// Reports that an unclosed delimiter was found.
+    ///
+    /// # Params
+    /// 1. The span of the unmatched delimiter.
+    fn unmatched_closing_delimiter(&mut self, offending_delimiter: &str, offending_span: Span) {
+        self.report(Diag::new().error(
+            format!("unmatched closing delimiter '{}'", offending_delimiter),
+            Some(offending_span),
+        ));
+    }
 }
 
 impl<T: Report> SyntaxDiagnostics for T {}
