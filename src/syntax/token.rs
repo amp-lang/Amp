@@ -228,8 +228,8 @@ impl<'src> TokenStream<'src> {
 
     /// Creates an iterator through the items in this [TokenStream].
     #[inline]
-    pub fn iter(&self) -> TokenStreamIter<'_, 'src> {
-        TokenStreamIter {
+    pub fn iter(&self) -> TokenIter<'_, 'src> {
+        TokenIter {
             stream: self,
             cursor: 0,
         }
@@ -238,19 +238,19 @@ impl<'src> TokenStream<'src> {
 
 /// An iterator through the items in a [TokenStream].
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct TokenStreamIter<'a, 'src> {
+pub struct TokenIter<'a, 'src> {
     stream: &'a TokenStream<'src>,
     cursor: usize,
 }
 
-impl<'a, 'src> TokenStreamIter<'a, 'src> {
-    /// Returns the next token in the [TokenStreamIter] without advancing it.
+impl<'a, 'src> TokenIter<'a, 'src> {
+    /// Returns the next token in the [TokenIter] without advancing it.
     #[inline]
     pub fn peek(&self) -> Option<&TokenTree<'src>> {
         self.peek_nth(0)
     }
 
-    /// Returns the *n*th future token in the [TokenStreamIter] without advancing it.
+    /// Returns the *n*th future token in the [TokenIter] without advancing it.
     pub fn peek_nth(&self, n: usize) -> Option<&TokenTree<'src>> {
         if self.cursor + n >= self.stream.tokens.len() {
             None
@@ -260,7 +260,7 @@ impl<'a, 'src> TokenStreamIter<'a, 'src> {
     }
 }
 
-impl<'a, 'src> Iterator for TokenStreamIter<'a, 'src> {
+impl<'a, 'src> Iterator for TokenIter<'a, 'src> {
     type Item = &'a TokenTree<'src>;
 
     fn next(&mut self) -> Option<Self::Item> {
