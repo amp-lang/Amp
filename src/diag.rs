@@ -108,6 +108,18 @@ pub trait SyntaxDiagnostics: Report {
             Some(offending_span),
         ));
     }
+
+    /// Reports that a too large integer literal token was found.
+    ///
+    /// # Params
+    /// 1. The span of the integer.
+    fn integer_too_large(&mut self, offending_span: Span) {
+        self.report(
+            Diag::new()
+                .error("integer is too large", Some(offending_span))
+                .note(format!("currently, {} is the max", u64::MAX), None),
+        )
+    }
 }
 
 impl<T: Report> SyntaxDiagnostics for T {}
