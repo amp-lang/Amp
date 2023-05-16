@@ -25,7 +25,7 @@ fn main() -> Result<(), ()> {
         }
     };
 
-    let res = Arglist::parse(&mut cx, &mut tokens.iter(), Expr::parse);
+    let res = Expr::parse(&mut cx, &mut tokens.iter());
     cx.emit().unwrap();
 
     println!("{:#?}", res);

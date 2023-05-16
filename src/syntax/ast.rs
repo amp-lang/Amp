@@ -8,7 +8,7 @@ use crate::{
 };
 
 use super::{
-    parser::{Parse, Recoverable},
+    parser::{IfRecoverable, Parse, Recoverable},
     token::{Delimiter, LiteralKind, PunctKind, TokenIter},
 };
 
@@ -172,17 +172,33 @@ impl Spanned for Int {
     }
 }
 
+/// A function call expression.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Call {
+    pub span: Span,
+    pub callee: Expr,
+    pub args: Arglist<Expr>,
+}
+
+impl Spanned for Call {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
 /// An Amp expression.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Expr {
     Id(Id),
     Str(Str),
     Int(Int),
+    Call(Box<Call>),
 }
 
 impl Expr {
-    /// [Parse]s an [Expr] from the provided tokens.
-    pub fn parse(cx: &mut Context, tokens: &mut TokenIter) -> Result<Self, Recoverable> {
+    /// Parses a single "atom" of an expression, such as a literal or a sub-expression wrapped in
+    /// parentheses.
+    fn parse_atom(cx: &mut Context, tokens: &mut TokenIter) -> Result<Self, Recoverable> {
         match Id::parse(cx, tokens) {
             Ok(value) => return Ok(Self::Id(value)),
             Err(Recoverable::No) => return Err(Recoverable::No),
@@ -202,5 +218,62 @@ impl Expr {
         }
 
         Err(Recoverable::Yes)
+    }
+
+    /// Parses a basic expression with a Pratt parser-style implementation.
+    fn pratt_parse(
+        cx: &mut Context,
+        tokens: &mut TokenIter,
+        min_bp: u8,
+    ) -> Result<Self, Recoverable> {
+        let mut lhs = Self::parse_atom(cx, tokens)?;
+
+        loop {
+            let op = match tokens.clone().next() {
+                Some(token) => token,
+                None => break,
+            };
+
+            // Check if the token is a valid operator.
+            if let Some((l_bp, ())) = op.postfix_binding_power() {
+                if l_bp < min_bp {
+                    break;
+                }
+            } else {
+                break;
+            }
+
+            match op {
+                TokenTree::Group(group) if group.delim() == Delimiter::Paren => {
+                    lhs = Self::Call(Box::new(Call {
+                        span: lhs.span(),
+                        callee: lhs,
+                        args: Arglist::parse(cx, tokens, Expr::parse)
+                            .if_recoverable(|| unreachable!("should not be reachable"))?,
+                    }));
+                }
+                _ => unreachable!(
+                    "no other operators are implemented yet. replace this with a catchall."
+                ),
+            }
+        }
+
+        Ok(lhs)
+    }
+
+    /// [Parse]s an [Expr] from the provided tokens.
+    pub fn parse(cx: &mut Context, tokens: &mut TokenIter) -> Result<Self, Recoverable> {
+        Self::pratt_parse(cx, tokens, 0)
+    }
+}
+
+impl Spanned for Expr {
+    fn span(&self) -> Span {
+        match self {
+            Self::Id(expr) => expr.span(),
+            Self::Str(expr) => expr.span(),
+            Self::Int(expr) => expr.span(),
+            Self::Call(expr) => expr.span(),
+        }
     }
 }

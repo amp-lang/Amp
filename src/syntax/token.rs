@@ -281,6 +281,17 @@ pub enum TokenTree<'src> {
     Group(Group<'src>),
 }
 
+impl<'src> TokenTree<'src> {
+    /// Returns the postfix binding power of this [TokenTree] (if it can be used a postfix
+    /// operator).
+    pub fn postfix_binding_power(&self) -> Option<(u8, ())> {
+        match self {
+            Self::Group(group) => group.delim().postfix_binding_power(),
+            _ => None,
+        }
+    }
+}
+
 impl<'src> Spanned for TokenTree<'src> {
     fn span(&self) -> Span {
         match self {
