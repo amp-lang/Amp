@@ -1,7 +1,7 @@
 use ampc::{
     syntax::{
         self,
-        ast::{Expr, Int},
+        ast::{Arglist, Expr},
     },
     Context,
 };
@@ -25,7 +25,7 @@ fn main() -> Result<(), ()> {
         }
     };
 
-    let res = Expr::parse(&mut cx, &mut tokens.iter());
+    let res = Arglist::parse(&mut cx, &mut tokens.iter(), Expr::parse);
     cx.emit().unwrap();
 
     println!("{:#?}", res);

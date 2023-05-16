@@ -120,6 +120,35 @@ pub trait SyntaxDiagnostics: Report {
                 .note(format!("currently, {} is the max", u64::MAX), None),
         )
     }
+
+    /// Reports that an invalid parameter was found in an argument list.
+    ///
+    /// # Params
+    /// 1. The span of the invalid parameter.
+    /// 2. The span of the end of the argument list.
+    fn invalid_arglist_param(&mut self, offending_span: Span, arglist_end: Span) {
+        self.report(
+            Diag::new()
+                .error(
+                    "expected parameter or `)` in argument list",
+                    Some(offending_span),
+                )
+                .note("argument list ends here", Some(arglist_end)),
+        )
+    }
+
+    /// Reports that argument list expected a comma or closing delimiter.
+    ///
+    /// # Params
+    /// 1. The span where a comma/delimiter was expected.
+    /// 2. The span of the end of the argument list.
+    fn arglist_expected_comma_or_close(&mut self, offending_span: Span, arglist_end: Span) {
+        self.report(
+            Diag::new()
+                .error("expected `,` or `)` here", Some(offending_span))
+                .note("argument list ends here", Some(arglist_end)),
+        )
+    }
 }
 
 impl<T: Report> SyntaxDiagnostics for T {}

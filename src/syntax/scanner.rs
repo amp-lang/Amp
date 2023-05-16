@@ -241,6 +241,7 @@ impl<'cx, 'src> Scanner<'cx, 'src> {
     /// iterated past.
     ///
     /// TODO: non-decimal integers, floats.
+    /// TODO: disallow identifier prefixes
     fn scan_num(&mut self) -> Token {
         while let Some(digit) = self.peek_char() {
             if !Self::is_digit(digit) && digit != '_' {

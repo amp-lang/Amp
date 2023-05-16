@@ -190,6 +190,16 @@ pub enum Delimiter {
     Paren,
 }
 
+impl Delimiter {
+    /// Returns the postfix binding power of the [Delimiter], if any.
+    pub fn postfix_binding_power(&self) -> Option<(u8, ())> {
+        match self {
+            Self::Paren => Some((1, ())),
+            _ => None,
+        }
+    }
+}
+
 /// A group token, such as `{}` or `()`.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Group<'src> {
@@ -200,6 +210,9 @@ pub struct Group<'src> {
 
 impl<'src> Group<'src> {
     /// Creates a new [Group] token.
+    ///
+    /// NOTE: the span of the [Group] should span atleast two characters, to make sure the opening
+    /// and closing delimiters are included.
     #[inline]
     pub fn new(span: Span, delim: Delimiter, stream: TokenStream<'src>) -> Self {
         Self {
@@ -219,6 +232,24 @@ impl<'src> Group<'src> {
     #[inline]
     pub fn tokens(&self) -> &TokenStream {
         &self.stream
+    }
+
+    /// Returns the [Span] of the opening delimiter.
+    #[inline]
+    pub fn start_span(&self) -> Span {
+        let whole_span = self.span();
+        Span::new(
+            whole_span.file_id(),
+            whole_span.start(),
+            whole_span.start() + 1,
+        )
+    }
+
+    /// Returns the [Span] of the closing delimiter.
+    #[inline]
+    pub fn end_span(&self) -> Span {
+        let whole_span = self.span();
+        Span::new(whole_span.file_id(), whole_span.end() - 1, whole_span.end())
     }
 }
 
@@ -290,8 +321,7 @@ impl<'src> TokenStream<'src> {
     #[inline]
     pub fn iter(&self) -> TokenIter<'_, 'src> {
         TokenIter {
-            stream: self,
-            cursor: 0,
+            stream: &self.tokens,
         }
     }
 }
@@ -299,8 +329,7 @@ impl<'src> TokenStream<'src> {
 /// An iterator through the items in a [TokenStream].
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TokenIter<'a, 'src> {
-    stream: &'a TokenStream<'src>,
-    cursor: usize,
+    stream: &'a [TokenTree<'src>],
 }
 
 impl<'a, 'src> TokenIter<'a, 'src> {
@@ -312,11 +341,7 @@ impl<'a, 'src> TokenIter<'a, 'src> {
 
     /// Returns the *n*th future token in the [TokenIter] without advancing it.
     pub fn peek_nth(&self, n: usize) -> Option<&TokenTree<'src>> {
-        if self.cursor + n >= self.stream.tokens.len() {
-            None
-        } else {
-            Some(&self.stream.tokens[self.cursor + n])
-        }
+        self.stream.get(n)
     }
 
     /// Expects the next token to be the provided token type.  Returns [`Recoverable::Yes`] if it
@@ -337,36 +362,52 @@ impl<'a, 'src> TokenIter<'a, 'src> {
     /// Expects the next token to be a literal of the provided type.  Returns [`Recoverable::Yes`]
     /// if it was not.
     pub fn expect_literal(&mut self, kind: LiteralKind) -> Result<&Literal, Recoverable> {
-        match self.peek() {
+        let old = self.clone();
+        match self.next() {
             Some(TokenTree::Literal(literal)) if literal.kind == kind => Ok(literal),
-            _ => Err(Recoverable::Yes),
+            _ => {
+                *self = old;
+                Err(Recoverable::Yes)
+            }
         }
     }
 
     /// Expects the next token to be a reserved word of the provided type. Returns
     /// [`Recoverable::Yes`] if it was not.
     pub fn expect_reserved(&mut self, kind: ReservedWord) -> Result<&Reserved, Recoverable> {
-        match self.peek() {
+        let old = self.clone();
+        match self.next() {
             Some(TokenTree::Reserved(reserved)) if reserved.kind == kind => Ok(reserved),
-            _ => Err(Recoverable::Yes),
+            _ => {
+                *self = old;
+                Err(Recoverable::Yes)
+            }
         }
     }
 
     /// Expects the next token to be a punctuator of the provided type. Returns
     /// [`Recoverable::Yes`] if it was not.
     pub fn expect_punct(&mut self, kind: PunctKind) -> Result<&Punct, Recoverable> {
-        match self.peek() {
+        let old = self.clone();
+        match self.next() {
             Some(TokenTree::Punct(punct)) if punct.kind == kind => Ok(punct),
-            _ => Err(Recoverable::Yes),
+            _ => {
+                *self = old;
+                Err(Recoverable::Yes)
+            }
         }
     }
 
     /// Expects the next token to be a group of the provided type. Returns [`Recoverable::Yes`] if
     /// it was not.
     pub fn expect_group(&mut self, delimiter: Delimiter) -> Result<&Group, Recoverable> {
-        match self.peek() {
+        let old = self.clone();
+        match self.next() {
             Some(TokenTree::Group(group)) if group.delim() == delimiter => Ok(group),
-            _ => Err(Recoverable::Yes),
+            _ => {
+                *self = old;
+                Err(Recoverable::Yes)
+            }
         }
     }
 }
@@ -375,12 +416,8 @@ impl<'a, 'src> Iterator for TokenIter<'a, 'src> {
     type Item = &'a TokenTree<'src>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.cursor >= self.stream.tokens.len() {
-            return None;
-        }
-
-        let item = &self.stream.tokens[self.cursor];
-        self.cursor += 1;
+        let item = self.stream.get(0)?;
+        self.stream = &self.stream[1..];
         Some(item)
     }
 }

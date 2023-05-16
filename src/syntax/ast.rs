@@ -3,13 +3,78 @@
 use crate::{
     codemap::{Span, Spanned},
     diag::SyntaxDiagnostics,
+    syntax::token::TokenTree,
     Context,
 };
 
 use super::{
-    parser::Recoverable,
-    token::{LiteralKind, TokenIter},
+    parser::{Parse, Recoverable},
+    token::{Delimiter, LiteralKind, PunctKind, TokenIter},
 };
+
+// Macros
+
+/// An argument list.
+///
+/// ```amp
+/// (42, "Hello, world!")
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Arglist<T> {
+    pub span: Span,
+    pub items: Vec<T>,
+}
+
+impl<T> Arglist<T> {
+    pub fn parse(
+        cx: &mut Context,
+        tokens: &mut TokenIter,
+        mut parser: impl Parse<T>,
+    ) -> Result<Self, Recoverable> {
+        let group = tokens.expect_group(Delimiter::Paren)?;
+        let mut items = Vec::new();
+
+        let mut ok = true;
+        let mut tokens = group.tokens().iter();
+
+        while let Some(token) = tokens.peek().cloned() {
+            let item = match parser.parse(cx, &mut tokens) {
+                Ok(item) => item,
+                Err(recoverable) => {
+                    ok = false;
+
+                    if recoverable == Recoverable::Yes {
+                        tokens.next();
+                        cx.invalid_arglist_param(token.span(), group.end_span());
+                    }
+
+                    continue;
+                }
+            };
+
+            dbg!(tokens.peek());
+            items.push(item);
+            if let Some(token) = tokens.next() {
+                match token {
+                    TokenTree::Punct(punct) if punct.kind() == PunctKind::Comma => {}
+                    _ => cx.arglist_expected_comma_or_close(token.span(), group.end_span()),
+                }
+            } else {
+                break;
+            }
+        }
+
+        if !ok {
+            // Diagnostics must already have been thrown.
+            return Err(Recoverable::No);
+        }
+
+        Ok(Self {
+            span: group.span(),
+            items,
+        })
+    }
+}
 
 // Literals
 
@@ -124,7 +189,7 @@ impl Expr {
             Err(Recoverable::No) => return Err(Recoverable::No),
             Err(Recoverable::Yes) => {}
         }
-        dbg!("TEST");
+
         Err(Recoverable::Yes)
     }
 }
