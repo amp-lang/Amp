@@ -1,9 +1,9 @@
 use ampc::{
-    syntax::{self},
+    syntax::{self, ast::Id},
     Context,
 };
 
-fn main() {
+fn main() -> Result<(), ()> {
     let mut cx = Context::new();
     let file_id = cx.add_file(
         "HelloWorld.amp",
@@ -11,9 +11,20 @@ fn main() {
     );
 
     let source = cx.files().get(file_id).unwrap().source().to_owned();
-    let tokens = syntax::scan(&mut cx, file_id, &source);
+    let tokens = {
+        let res = syntax::scan(&mut cx, file_id, &source);
 
-    cx.emit().unwrap();
+        cx.emit().unwrap();
 
-    println!("{:#?}", tokens);
+        match res {
+            Ok(value) => value,
+            Err(_) => return Err(()),
+        }
+    };
+
+    let res = Id::parse(&mut cx, &mut tokens.iter());
+
+    println!("{:#?}", res);
+
+    Ok(())
 }

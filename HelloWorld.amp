@@ -1,9 +1,1 @@
-// Declare `printf`, which comes from the C standard library when the program is linked.
-const Printf = func printf(format: &u8): i32;
-
-// The `main` function, exported and used by the C runtime as the entry point for the program.
-const Main = func main(): i32 {
-    // The string literal is implicitly null-terminated, this will not be allowed in the future.
-    Printf("Hello, world!");
-    return 0;
-};
+Hello

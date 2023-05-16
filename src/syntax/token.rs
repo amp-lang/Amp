@@ -1,5 +1,7 @@
 use crate::codemap::{Span, Spanned};
 
+use super::parser::Recoverable;
+
 /// The identifying kind of a [Literal] token.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum LiteralKind {
@@ -47,6 +49,19 @@ impl<'src> Spanned for Literal<'src> {
     }
 }
 
+impl<'src> Token<'src> for Literal<'src> {
+    fn from_token_tree<'a>(token_tree: &'a TokenTree<'src>) -> Option<&'a Self> {
+        match token_tree {
+            TokenTree::Literal(literal) => Some(literal),
+            _ => None,
+        }
+    }
+
+    fn matches(token_tree: &TokenTree) -> bool {
+        matches!(token_tree, TokenTree::Literal(_))
+    }
+}
+
 /// The identifying kind of a [Reserved] token.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ReservedWord {
@@ -91,6 +106,19 @@ impl Spanned for Reserved {
     }
 }
 
+impl<'src> Token<'src> for Reserved {
+    fn from_token_tree<'a>(token_tree: &'a TokenTree<'src>) -> Option<&'a Self> {
+        match token_tree {
+            TokenTree::Reserved(reserved) => Some(reserved),
+            _ => None,
+        }
+    }
+
+    fn matches(token_tree: &TokenTree) -> bool {
+        matches!(token_tree, TokenTree::Reserved(_))
+    }
+}
+
 /// The identifying kind of a [Punct] token.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum PunctKind {
@@ -115,6 +143,12 @@ impl Punct {
         Self { span, kind }
     }
 
+    /// Returns the kind of this token.
+    #[inline]
+    pub fn kind(&self) -> PunctKind {
+        self.kind
+    }
+
     /// Returns the raw string value of this [Punct] token.
     pub fn as_str(&self) -> &str {
         match self.kind {
@@ -130,6 +164,19 @@ impl Punct {
 impl Spanned for Punct {
     fn span(&self) -> Span {
         self.span
+    }
+}
+
+impl<'src> Token<'src> for Punct {
+    fn from_token_tree<'a>(token_tree: &'a TokenTree<'src>) -> Option<&'a Self> {
+        match token_tree {
+            TokenTree::Punct(punct) => Some(punct),
+            _ => None,
+        }
+    }
+
+    fn matches(token_tree: &TokenTree) -> bool {
+        matches!(token_tree, TokenTree::Punct(_))
     }
 }
 
@@ -178,6 +225,19 @@ impl<'src> Group<'src> {
 impl<'src> Spanned for Group<'src> {
     fn span(&self) -> Span {
         self.span
+    }
+}
+
+impl<'src> Token<'src> for Group<'src> {
+    fn from_token_tree<'a>(token_tree: &'a TokenTree<'src>) -> Option<&'a Self> {
+        match token_tree {
+            TokenTree::Group(group) => Some(group),
+            _ => None,
+        }
+    }
+
+    fn matches(token_tree: &TokenTree) -> bool {
+        matches!(token_tree, TokenTree::Group(_))
     }
 }
 
@@ -258,6 +318,69 @@ impl<'a, 'src> TokenIter<'a, 'src> {
             Some(&self.stream.tokens[self.cursor + n])
         }
     }
+
+    /// Expects the next token to be the provided token type.  Returns [`Recoverable::Yes`] if it
+    /// was not.
+    pub fn expect<T: Token<'src>>(&mut self) -> Result<&T, Recoverable> {
+        match self.peek() {
+            Some(token) => {
+                if T::matches(token) {
+                    Ok(T::from_token_tree(self.next().unwrap()).unwrap())
+                } else {
+                    Err(Recoverable::Yes)
+                }
+            }
+            None => Err(Recoverable::Yes),
+        }
+    }
+
+    /// Expects the next token to be a literal of the provided type.  Returns [`Recoverable::Yes`]
+    /// if it was not.
+    pub fn expect_literal(&mut self, kind: LiteralKind) -> Result<&Literal, Recoverable> {
+        let literal = self.expect::<Literal>()?;
+
+        if literal.kind != kind {
+            Err(Recoverable::Yes)
+        } else {
+            Ok(literal)
+        }
+    }
+
+    /// Expects the next token to be a reserved word of the provided type. Returns
+    /// [`Recoverable::Yes`] if it was not.
+    pub fn expect_reserved(&mut self, kind: ReservedWord) -> Result<&Reserved, Recoverable> {
+        let reserved = self.expect::<Reserved>()?;
+
+        if reserved.kind != kind {
+            Err(Recoverable::Yes)
+        } else {
+            Ok(reserved)
+        }
+    }
+
+    /// Expects the next token to be a punctuator of the provided type. Returns
+    /// [`Recoverable::Yes`] if it was not.
+    pub fn expect_punct(&mut self, kind: PunctKind) -> Result<&Punct, Recoverable> {
+        let punct = self.expect::<Punct>()?;
+
+        if punct.kind() != kind {
+            Err(Recoverable::Yes)
+        } else {
+            Ok(punct)
+        }
+    }
+
+    /// Expects the next token to be a group of the provided type. Returns [`Recoverable::Yes`] if
+    /// it was not.
+    pub fn expect_group(&mut self, delimiter: Delimiter) -> Result<&Group, Recoverable> {
+        let group = self.expect::<Group>()?;
+
+        if group.delim() != delimiter {
+            Err(Recoverable::Yes)
+        } else {
+            Ok(group)
+        }
+    }
 }
 
 impl<'a, 'src> Iterator for TokenIter<'a, 'src> {
@@ -272,4 +395,13 @@ impl<'a, 'src> Iterator for TokenIter<'a, 'src> {
         self.cursor += 1;
         Some(item)
     }
+}
+
+/// Any value which is a token.
+pub trait Token<'src>: 'src + Sized {
+    /// Returns `true` if the provided [TokenTree] matches this token.
+    fn matches(token_tree: &TokenTree<'src>) -> bool;
+
+    /// Attempts to convert a [TokenTree] into this specific token.
+    fn from_token_tree<'a>(token_tree: &'a TokenTree<'src>) -> Option<&'a Self>;
 }
