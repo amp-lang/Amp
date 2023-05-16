@@ -52,7 +52,6 @@ impl<T> Arglist<T> {
                 }
             };
 
-            dbg!(tokens.peek());
             items.push(item);
             if let Some(token) = tokens.next() {
                 match token {
