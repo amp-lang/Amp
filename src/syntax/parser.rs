@@ -17,7 +17,8 @@ pub enum Recoverable {
 
 /// [Result<T, Recoverable>] methods.
 pub trait IfRecoverable<T> {
-    /// Calls the provided callback if this value is a [Recoverable::Yes] error type.
+    /// Calls the provided callback if this value is a [`Recoverable::Yes`] error type.  If this
+    /// value is [Recoverable], returns the result of the provided callback, wrapped in [`Err`].
     fn if_recoverable(self, callback: impl FnMut() -> Recoverable) -> Result<T, Recoverable>;
 }
 

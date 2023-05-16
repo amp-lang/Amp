@@ -22,8 +22,8 @@ pub struct Id {
 
 impl Id {
     /// [Parse]s an [Id] from the provided tokens.
-    pub fn parse(_cx: &mut Context, token: &mut TokenIter) -> Result<Self, Recoverable> {
-        let token = token.expect_literal(LiteralKind::Id)?;
+    pub fn parse(_cx: &mut Context, tokens: &mut TokenIter) -> Result<Self, Recoverable> {
+        let token = tokens.expect_literal(LiteralKind::Id)?;
 
         Ok(Self {
             span: token.span(),
@@ -46,17 +46,23 @@ pub struct Str {
 }
 
 impl Str {
-    /// [Parse]s an [Str] from the provided tokens.
+    /// [Parse]s a [Str] from the provided tokens.
     ///
     /// TODO: implement parsing string escapes
-    pub fn parse(_cx: &mut Context, token: &mut TokenIter) -> Result<Self, Recoverable> {
-        let token = token.expect_literal(LiteralKind::Str)?;
+    pub fn parse(_cx: &mut Context, tokens: &mut TokenIter) -> Result<Self, Recoverable> {
+        let token = tokens.expect_literal(LiteralKind::Str)?;
         let value = token.as_str();
 
         Ok(Self {
             span: token.span(),
             value: value[1..value.len() - 1].to_string(),
         })
+    }
+}
+
+impl Spanned for Str {
+    fn span(&self) -> Span {
+        self.span
     }
 }
 
@@ -68,11 +74,11 @@ pub struct Int {
 }
 
 impl Int {
-    /// [Parse]s an [Str] from the provided tokens.
+    /// [Parse]s an [Int] from the provided tokens.
     ///
     /// TODO: implement parsing non-decimal integers
-    pub fn parse(cx: &mut Context, token: &mut TokenIter) -> Result<Self, Recoverable> {
-        let token = token.expect_literal(LiteralKind::DecInt)?;
+    pub fn parse(cx: &mut Context, tokens: &mut TokenIter) -> Result<Self, Recoverable> {
+        let token = tokens.expect_literal(LiteralKind::DecInt)?;
 
         Ok(Self {
             span: token.span(),
@@ -81,5 +87,44 @@ impl Int {
                 Err(Recoverable::No)
             })?,
         })
+    }
+}
+
+impl Spanned for Int {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+/// An Amp expression.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Expr {
+    Id(Id),
+    Str(Str),
+    Int(Int),
+}
+
+impl Expr {
+    /// [Parse]s an [Expr] from the provided tokens.
+    pub fn parse(cx: &mut Context, tokens: &mut TokenIter) -> Result<Self, Recoverable> {
+        match Id::parse(cx, tokens) {
+            Ok(value) => return Ok(Self::Id(value)),
+            Err(Recoverable::No) => return Err(Recoverable::No),
+            Err(Recoverable::Yes) => {}
+        }
+
+        match Str::parse(cx, tokens) {
+            Ok(value) => return Ok(Self::Str(value)),
+            Err(Recoverable::No) => return Err(Recoverable::No),
+            Err(Recoverable::Yes) => {}
+        }
+
+        match Int::parse(cx, tokens) {
+            Ok(value) => return Ok(Self::Int(value)),
+            Err(Recoverable::No) => return Err(Recoverable::No),
+            Err(Recoverable::Yes) => {}
+        }
+        dbg!("TEST");
+        Err(Recoverable::Yes)
     }
 }

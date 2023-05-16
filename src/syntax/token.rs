@@ -337,48 +337,36 @@ impl<'a, 'src> TokenIter<'a, 'src> {
     /// Expects the next token to be a literal of the provided type.  Returns [`Recoverable::Yes`]
     /// if it was not.
     pub fn expect_literal(&mut self, kind: LiteralKind) -> Result<&Literal, Recoverable> {
-        let literal = self.expect::<Literal>()?;
-
-        if literal.kind != kind {
-            Err(Recoverable::Yes)
-        } else {
-            Ok(literal)
+        match self.peek() {
+            Some(TokenTree::Literal(literal)) if literal.kind == kind => Ok(literal),
+            _ => Err(Recoverable::Yes),
         }
     }
 
     /// Expects the next token to be a reserved word of the provided type. Returns
     /// [`Recoverable::Yes`] if it was not.
     pub fn expect_reserved(&mut self, kind: ReservedWord) -> Result<&Reserved, Recoverable> {
-        let reserved = self.expect::<Reserved>()?;
-
-        if reserved.kind != kind {
-            Err(Recoverable::Yes)
-        } else {
-            Ok(reserved)
+        match self.peek() {
+            Some(TokenTree::Reserved(reserved)) if reserved.kind == kind => Ok(reserved),
+            _ => Err(Recoverable::Yes),
         }
     }
 
     /// Expects the next token to be a punctuator of the provided type. Returns
     /// [`Recoverable::Yes`] if it was not.
     pub fn expect_punct(&mut self, kind: PunctKind) -> Result<&Punct, Recoverable> {
-        let punct = self.expect::<Punct>()?;
-
-        if punct.kind() != kind {
-            Err(Recoverable::Yes)
-        } else {
-            Ok(punct)
+        match self.peek() {
+            Some(TokenTree::Punct(punct)) if punct.kind == kind => Ok(punct),
+            _ => Err(Recoverable::Yes),
         }
     }
 
     /// Expects the next token to be a group of the provided type. Returns [`Recoverable::Yes`] if
     /// it was not.
     pub fn expect_group(&mut self, delimiter: Delimiter) -> Result<&Group, Recoverable> {
-        let group = self.expect::<Group>()?;
-
-        if group.delim() != delimiter {
-            Err(Recoverable::Yes)
-        } else {
-            Ok(group)
+        match self.peek() {
+            Some(TokenTree::Group(group)) if group.delim() == delimiter => Ok(group),
+            _ => Err(Recoverable::Yes),
         }
     }
 }
