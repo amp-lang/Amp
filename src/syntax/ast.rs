@@ -48,6 +48,15 @@ impl<T> Arglist<T> {
                         cx.invalid_arglist_param(token.span(), group.end_span());
                     }
 
+                    if let Some(token) = tokens.next() {
+                        match token {
+                            TokenTree::Punct(punct) if punct.kind() == PunctKind::Comma => {}
+                            _ => cx.arglist_expected_comma_or_close(token.span(), group.end_span()),
+                        }
+                    } else {
+                        break;
+                    }
+
                     continue;
                 }
             };
@@ -56,7 +65,10 @@ impl<T> Arglist<T> {
             if let Some(token) = tokens.next() {
                 match token {
                     TokenTree::Punct(punct) if punct.kind() == PunctKind::Comma => {}
-                    _ => cx.arglist_expected_comma_or_close(token.span(), group.end_span()),
+                    _ => {
+                        ok = false;
+                        cx.arglist_expected_comma_or_close(token.span(), group.end_span())
+                    }
                 }
             } else {
                 break;
