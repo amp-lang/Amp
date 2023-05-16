@@ -133,7 +133,7 @@ pub trait SyntaxDiagnostics: Report {
                     "expected parameter or `)` in argument list",
                     Some(offending_span),
                 )
-                .note("argument list ends here", Some(arglist_end)),
+                .note("argument list actually ends here", Some(arglist_end)),
         )
     }
 
@@ -146,7 +146,7 @@ pub trait SyntaxDiagnostics: Report {
         self.report(
             Diag::new()
                 .error("expected `,` or `)` here", Some(offending_span))
-                .note("argument list ends here", Some(arglist_end)),
+                .note("argument list actually ends here", Some(arglist_end)),
         )
     }
 }
