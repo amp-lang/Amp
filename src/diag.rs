@@ -180,6 +180,22 @@ pub trait SyntaxDiagnostics: Report {
                 ),
         )
     }
+
+    /// Reports that an invalid statement was found.
+    ///
+    /// # Params
+    /// 1. The span of the statement.
+    fn invalid_stmnt(&mut self, offending_span: Span) {
+        self.report(Diag::new().error("invalid statement", Some(offending_span)))
+    }
+
+    /// Reports that a semicolon was expected after an expression.
+    ///
+    /// # Params
+    /// 1. The span of the statement a semicolon was expected to follow.
+    fn expected_semicolon(&mut self, offending_span: Span) {
+        self.report(Diag::new().error("expected a semicolon", Some(offending_span)))
+    }
 }
 
 impl<T: Report> SyntaxDiagnostics for T {}

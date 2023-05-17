@@ -1,5 +1,5 @@
 use ampc::{
-    syntax::{self, ast::Const},
+    syntax::{self, ast::Stmnts},
     Context,
 };
 
@@ -22,7 +22,7 @@ fn main() -> Result<(), ()> {
         }
     };
 
-    let res = Const::parse(&mut cx, &mut tokens.iter());
+    let res = Stmnts::parse(&mut cx, &mut tokens.iter());
     cx.emit().unwrap();
 
     println!("{:#?}", res);

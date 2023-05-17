@@ -1,1 +1,2 @@
-const test: typeref = i32
+Printf("Hello, world!");
+return 0;

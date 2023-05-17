@@ -124,9 +124,18 @@ pub enum Expr {
     Str(Str),
     Int(Int),
     Call(Box<Call>),
+    Const(Box<Const>),
+    Return(Box<Return>),
 }
 
 impl Expr {
+    /// Returns `true` if this [Expr] requires a `;` terminator.
+    pub fn requires_terminator(&self) -> bool {
+        match self {
+            _ => true,
+        }
+    }
+
     /// Parses a single "atom" of an expression, such as a literal or a sub-expression wrapped in
     /// parentheses.
     fn parse_atom(cx: &mut Context, tokens: &mut TokenIter) -> Result<Self, Recoverable> {
@@ -194,6 +203,18 @@ impl Expr {
 
     /// [Parse]s an [Expr] from the provided tokens.
     pub fn parse(cx: &mut Context, tokens: &mut TokenIter) -> Result<Self, Recoverable> {
+        match Const::parse(cx, tokens) {
+            Ok(value) => return Ok(Self::Const(Box::new(value))),
+            Err(Recoverable::No) => return Err(Recoverable::No),
+            Err(Recoverable::Yes) => {}
+        }
+
+        match Return::parse(cx, tokens) {
+            Ok(value) => return Ok(Self::Return(Box::new(value))),
+            Err(Recoverable::No) => return Err(Recoverable::No),
+            Err(Recoverable::Yes) => {}
+        }
+
         Self::pratt_parse(cx, tokens, 0)
     }
 }
@@ -205,6 +226,8 @@ impl Spanned for Expr {
             Self::Str(expr) => expr.span(),
             Self::Int(expr) => expr.span(),
             Self::Call(expr) => expr.span(),
+            Self::Const(expr) => expr.span(),
+            Self::Return(expr) => expr.span(),
         }
     }
 }
@@ -312,6 +335,84 @@ impl Spanned for Call {
 
 // Statements
 
+/// A list of semicolon-terminated statements.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Stmnts {
+    pub span: Span,
+    pub stmnts: Vec<Expr>,
+}
+
+impl Stmnts {
+    pub fn parse(cx: &mut Context, tokens: &mut TokenIter) -> Result<Self, Recoverable> {
+        let mut ok = true;
+        let mut stmnts = Vec::new();
+        let mut span = Span::new(0, 0, 0);
+
+        while let Some(next) = tokens.clone().peek() {
+            let expr = match Expr::parse(cx, tokens) {
+                Ok(expr) => {
+                    let expr_span = expr.span();
+                    span = Span::new(expr_span.file_id(), span.start(), expr_span.end());
+                    expr
+                }
+                Err(recoverable) => {
+                    if recoverable == Recoverable::Yes {
+                        cx.invalid_stmnt(next.span());
+                        tokens.next();
+                    }
+                    ok = false;
+                    continue;
+                }
+            };
+
+            if expr.requires_terminator() {
+                match tokens.expect_punct(PunctKind::Semi) {
+                    Ok(_) => {}
+                    Err(_) => {
+                        ok = false;
+                        cx.expected_semicolon(expr.span());
+                        continue;
+                    }
+                }
+            }
+
+            stmnts.push(expr);
+        }
+
+        if !ok {
+            return Err(Recoverable::No);
+        }
+
+        Ok(Self { span, stmnts })
+    }
+}
+
+/// A code block.
+///
+/// ```amp
+/// {
+///     const my_var = 0;
+/// }
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Block {
+    pub span: Span,
+    pub stmnts: Stmnts,
+}
+
+impl Block {
+    /// Parses a [Block] from the provided tokens.
+    pub fn parse(cx: &mut Context, tokens: &mut TokenIter) -> Result<Self, Recoverable> {
+        let group = tokens.expect_group(Delimiter::Brace)?;
+        let stmnts = Stmnts::parse(cx, &mut group.tokens().iter())?;
+
+        Ok(Self {
+            span: group.span(),
+            stmnts,
+        })
+    }
+}
+
 /// A constant declaration.
 ///
 /// ```amp
@@ -361,6 +462,44 @@ impl Const {
 }
 
 impl Spanned for Const {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+/// A `return` expression.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Return {
+    pub span: Span,
+    pub value: Option<Expr>,
+}
+
+impl Return {
+    /// Parses a [Return] statement from the provided stream.
+    pub fn parse(cx: &mut Context, tokens: &mut TokenIter) -> Result<Self, Recoverable> {
+        let start_span = tokens.expect_reserved(ReservedWord::Return)?.span();
+
+        let value = match Expr::parse(cx, tokens) {
+            Ok(value) => Some(value),
+            Err(Recoverable::Yes) => None,
+            Err(Recoverable::No) => return Err(Recoverable::No),
+        };
+
+        Ok(Self {
+            span: Span::new(
+                start_span.file_id(),
+                start_span.start(),
+                match &value {
+                    Some(value) => value.span().end(),
+                    None => start_span.end(),
+                },
+            ),
+            value,
+        })
+    }
+}
+
+impl Spanned for Return {
     fn span(&self) -> Span {
         self.span
     }
