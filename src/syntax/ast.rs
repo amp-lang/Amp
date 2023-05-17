@@ -514,7 +514,14 @@ impl Func {
         };
 
         Ok(Self {
-            span: start_span,
+            span: Span::new(
+                start_span.file_id(),
+                start_span.start(),
+                match &block {
+                    Some(block) => block.span().end(),
+                    None => returns.span().end(),
+                },
+            ),
             name,
             args,
             returns,
@@ -639,6 +646,12 @@ impl Block {
             span: group.span(),
             stmnts,
         })
+    }
+}
+
+impl Spanned for Block {
+    fn span(&self) -> Span {
+        self.span
     }
 }
 
