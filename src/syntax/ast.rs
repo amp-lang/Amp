@@ -9,7 +9,7 @@ use crate::{
 
 use super::{
     parser::{IfRecoverable, Parse, Recoverable},
-    token::{Delimiter, LiteralKind, PunctKind, TokenIter},
+    token::{Delimiter, LiteralKind, PunctKind, ReservedWord, TokenIter},
 };
 
 // Macros
@@ -87,100 +87,31 @@ impl<T> Arglist<T> {
     }
 }
 
-// Literals
-
-/// An identifier literal.
+/// A type annotation.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Id {
+pub struct TypeAnnotation {
     pub span: Span,
-    pub value: String,
+    pub ty: Expr,
 }
 
-impl Id {
-    /// [Parse]s an [Id] from the provided tokens.
-    pub fn parse(_cx: &mut Context, tokens: &mut TokenIter) -> Result<Self, Recoverable> {
-        let token = tokens.expect_literal(LiteralKind::Id)?;
-
-        Ok(Self {
-            span: token.span(),
-            value: token.as_str().to_string(),
-        })
-    }
-}
-
-impl Spanned for Id {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-/// A string literal.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Str {
-    pub span: Span,
-    pub value: String,
-}
-
-impl Str {
-    /// [Parse]s a [Str] from the provided tokens.
-    ///
-    /// TODO: implement parsing string escapes
-    pub fn parse(_cx: &mut Context, tokens: &mut TokenIter) -> Result<Self, Recoverable> {
-        let token = tokens.expect_literal(LiteralKind::Str)?;
-        let value = token.as_str();
-
-        Ok(Self {
-            span: token.span(),
-            value: value[1..value.len() - 1].to_string(),
-        })
-    }
-}
-
-impl Spanned for Str {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-/// An integer literal.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Int {
-    pub span: Span,
-    pub value: u64,
-}
-
-impl Int {
-    /// [Parse]s an [Int] from the provided tokens.
-    ///
-    /// TODO: implement parsing non-decimal integers
+impl TypeAnnotation {
+    /// Parses a [TypeAnnotation] from the provided tokens.
     pub fn parse(cx: &mut Context, tokens: &mut TokenIter) -> Result<Self, Recoverable> {
-        let token = tokens.expect_literal(LiteralKind::DecInt)?;
+        let start_span = tokens.expect_punct(PunctKind::Colon)?.span();
+
+        let ty = Expr::parse(cx, tokens).if_recoverable(|| {
+            cx.expected_type_annotation_type(start_span);
+            Recoverable::No
+        })?;
 
         Ok(Self {
-            span: token.span(),
-            value: token.as_str().parse::<u64>().or_else(|_| {
-                cx.integer_too_large(token.span());
-                Err(Recoverable::No)
-            })?,
+            span: Span::new(start_span.file_id(), start_span.start(), ty.span().end()),
+            ty,
         })
     }
 }
 
-impl Spanned for Int {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-/// A function call expression.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Call {
-    pub span: Span,
-    pub callee: Expr,
-    pub args: Arglist<Expr>,
-}
-
-impl Spanned for Call {
+impl Spanned for TypeAnnotation {
     fn span(&self) -> Span {
         self.span
     }
@@ -275,5 +206,162 @@ impl Spanned for Expr {
             Self::Int(expr) => expr.span(),
             Self::Call(expr) => expr.span(),
         }
+    }
+}
+
+// Literals
+
+/// An identifier literal.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Id {
+    pub span: Span,
+    pub value: String,
+}
+
+impl Id {
+    /// [Parse]s an [Id] from the provided tokens.
+    pub fn parse(_cx: &mut Context, tokens: &mut TokenIter) -> Result<Self, Recoverable> {
+        let token = tokens.expect_literal(LiteralKind::Id)?;
+
+        Ok(Self {
+            span: token.span(),
+            value: token.as_str().to_string(),
+        })
+    }
+}
+
+impl Spanned for Id {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+/// A string literal.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Str {
+    pub span: Span,
+    pub value: String,
+}
+
+impl Str {
+    /// [Parse]s a [Str] from the provided tokens.
+    ///
+    /// TODO: implement parsing string escapes
+    pub fn parse(_cx: &mut Context, tokens: &mut TokenIter) -> Result<Self, Recoverable> {
+        let token = tokens.expect_literal(LiteralKind::Str)?;
+        let value = token.as_str();
+
+        Ok(Self {
+            span: token.span(),
+            value: value[1..value.len() - 1].to_string(),
+        })
+    }
+}
+
+impl Spanned for Str {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+/// An integer literal.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Int {
+    pub span: Span,
+    pub value: u64,
+}
+
+impl Int {
+    /// [Parse]s an [Int] from the provided tokens.
+    ///
+    /// TODO: implement parsing non-decimal integers
+    pub fn parse(cx: &mut Context, tokens: &mut TokenIter) -> Result<Self, Recoverable> {
+        let token = tokens.expect_literal(LiteralKind::DecInt)?;
+
+        Ok(Self {
+            span: token.span(),
+            value: token.as_str().parse::<u64>().or_else(|_| {
+                cx.integer_too_large(token.span());
+                Err(Recoverable::No)
+            })?,
+        })
+    }
+}
+
+impl Spanned for Int {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+// Expressions
+
+/// A function call expression.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Call {
+    pub span: Span,
+    pub callee: Expr,
+    pub args: Arglist<Expr>,
+}
+
+impl Spanned for Call {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+// Statements
+
+/// A constant declaration.
+///
+/// ```amp
+/// const MyValue = 42;
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Const {
+    pub span: Span,
+    pub name: Id,
+    pub ty: Option<TypeAnnotation>,
+}
+
+impl Const {
+    /// [Parse]s a [Const] declaration.
+    pub fn parse(cx: &mut Context, tokens: &mut TokenIter) -> Result<Self, Recoverable> {
+        let start_span = tokens.expect_reserved(ReservedWord::Const)?.span();
+
+        let name = Id::parse(cx, tokens).if_recoverable(|| {
+            cx.expected_binding_decl_name(start_span);
+            Recoverable::No
+        })?;
+
+        let ty = match TypeAnnotation::parse(cx, tokens) {
+            Ok(ty) => Some(ty),
+            Err(Recoverable::Yes) => None,
+            Err(Recoverable::No) => return Err(Recoverable::No),
+        };
+
+        tokens.expect_punct(PunctKind::Eq).if_recoverable(|| {
+            cx.expected_const_binding_value(Span::new(
+                start_span.file_id(),
+                start_span.start(),
+                match &ty {
+                    Some(end) => end.span().end(),
+                    None => name.span().end(),
+                },
+            ));
+            Recoverable::No
+        })?;
+
+        Ok(Self {
+            span: start_span,
+            name,
+            ty,
+        })
+    }
+}
+
+impl Spanned for Const {
+    fn span(&self) -> Span {
+        self.span
     }
 }

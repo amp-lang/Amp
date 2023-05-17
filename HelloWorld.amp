@@ -1,1 +1,1 @@
-Printf("Hello, world!", 42)
+const test: typeref = i32

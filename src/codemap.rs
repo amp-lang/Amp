@@ -38,6 +38,12 @@ impl Span {
     pub fn end(&self) -> usize {
         self.end as usize
     }
+
+    /// Returns a [Span] after this [Span].
+    #[inline]
+    pub fn next(&self) -> Span {
+        Span::new(self.file_id(), self.end(), self.end() + 1)
+    }
 }
 
 impl From<Span> for std::ops::Range<usize> {

@@ -421,6 +421,12 @@ impl<'a, 'src> TokenIter<'a, 'src> {
             }
         }
     }
+
+    /// Returns the span of the next token, if it exists.
+    #[inline]
+    pub fn peek_span(&self) -> Option<Span> {
+        Some(self.peek()?.span())
+    }
 }
 
 impl<'a, 'src> Iterator for TokenIter<'a, 'src> {

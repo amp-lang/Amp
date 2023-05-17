@@ -137,7 +137,7 @@ pub trait SyntaxDiagnostics: Report {
         )
     }
 
-    /// Reports that argument list expected a comma or closing delimiter.
+    /// Reports that an argument list expected a comma or closing delimiter.
     ///
     /// # Params
     /// 1. The span where a comma/delimiter was expected.
@@ -147,6 +147,37 @@ pub trait SyntaxDiagnostics: Report {
             Diag::new()
                 .error("expected `,` or `)` here", Some(offending_span))
                 .note("argument list actually ends here", Some(arglist_end)),
+        )
+    }
+
+    /// Reports that a binding declaration was missing a valid name identifier.
+    ///
+    /// # Params
+    /// 1. The span of the binding starting keyword (`const` or `var`).
+    fn expected_binding_decl_name(&mut self, offending_span: Span) {
+        self.report(Diag::new().error("expected a binding identifier", Some(offending_span)))
+    }
+
+    /// Reports that a type annotation was started but no type was found.
+    ///
+    /// # Params
+    /// 1. The span of the `:` that started the type annotation.
+    fn expected_type_annotation_type(&mut self, offending_span: Span) {
+        self.report(Diag::new().error("expected type in type annotation", Some(offending_span)))
+    }
+
+    /// Reports that a `const` binding was missing a value.
+    ///
+    /// # Params
+    /// 1. The span of the `const` keyword to the end of the type annotation/name.
+    fn expected_const_binding_value(&mut self, offending_span: Span) {
+        self.report(
+            Diag::new()
+                .error("expected value for `const` binding", Some(offending_span))
+                .note(
+                    "`const` bindings must be declared with a value known at compile time",
+                    None,
+                ),
         )
     }
 }
