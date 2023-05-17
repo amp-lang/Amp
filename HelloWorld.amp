@@ -4,3 +4,5 @@ const Main = func main(): i32 {
     Printf("Hello, world!");
     return 0;
 };
+
+const Main = func(): void;

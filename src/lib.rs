@@ -5,6 +5,7 @@
 pub mod codemap;
 mod context;
 pub mod diag;
+pub mod sema;
 pub mod syntax;
 
 pub use context::*;

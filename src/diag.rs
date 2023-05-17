@@ -224,3 +224,32 @@ pub trait SyntaxDiagnostics: Report {
 }
 
 impl<T: Report> SyntaxDiagnostics for T {}
+
+/// Semantic analysis diagnostics.
+pub trait SemaDiagnostics: Report {
+    /// Reports that there are two symbols in this scope with the same name.
+    ///
+    /// # Params
+    /// 1. The name of the problematic declaration.
+    /// 2. The span of the offending declaration.
+    /// 3. The span of the first declaration, if any.
+    fn duplicate_declaration(
+        &mut self,
+        name: &str,
+        offending_span: Span,
+        original_span: Option<Span>,
+    ) {
+        let mut diag = Diag::new().error(
+            format!("'{}' is already declared in this scope", name),
+            Some(offending_span),
+        );
+
+        if let Some(original_span) = original_span {
+            diag = diag.note("originally declared here", Some(original_span));
+        }
+
+        self.report(diag)
+    }
+}
+
+impl<T: Report> SemaDiagnostics for T {}

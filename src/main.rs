@@ -1,9 +1,12 @@
+use std::process::ExitCode;
+
 use ampc::{
+    sema,
     syntax::{self, ast::Stmnts},
     Context,
 };
 
-fn main() -> Result<(), ()> {
+fn main() -> ExitCode {
     let mut cx = Context::new();
     let file_id = cx.add_file(
         "HelloWorld.amp",
@@ -18,14 +21,32 @@ fn main() -> Result<(), ()> {
 
         match res {
             Ok(value) => value,
-            Err(_) => return Err(()),
+            Err(_) => return ExitCode::FAILURE,
         }
     };
 
-    let res = Stmnts::parse(&mut cx, &mut tokens.iter());
-    cx.emit().unwrap();
+    let ast = {
+        let res = Stmnts::parse(&mut cx, &mut tokens.iter());
 
-    println!("{:#?}", res);
+        cx.emit().unwrap();
 
-    Ok(())
+        match res {
+            Ok(value) => value,
+            Err(_) => return ExitCode::FAILURE,
+        }
+    };
+
+    let mut unit = sema::Unit::new();
+    {
+        let res = unit.analyze(&mut cx, ast);
+
+        cx.emit().unwrap();
+
+        match res {
+            Ok(_) => {}
+            Err(_) => return ExitCode::FAILURE,
+        }
+    };
+
+    ExitCode::SUCCESS
 }
