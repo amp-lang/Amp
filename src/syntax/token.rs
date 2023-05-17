@@ -68,6 +68,7 @@ pub enum ReservedWord {
     Const,
     Func,
     Return,
+    Mut,
 }
 
 /// A reserved word token.
@@ -96,6 +97,7 @@ impl Reserved {
             ReservedWord::Const => "const",
             ReservedWord::Func => "func",
             ReservedWord::Return => "return",
+            ReservedWord::Mut => "mut",
         }
     }
 }
@@ -127,6 +129,16 @@ pub enum PunctKind {
     Comma,
     Eq,
     Semi,
+}
+
+impl PunctKind {
+    /// Returns the prefix binding power of this [Punct], if any.
+    pub fn prefix_binding_power(&self) -> Option<((), u8)> {
+        match self {
+            Self::And => Some(((), 1)),
+            _ => None,
+        }
+    }
 }
 
 /// A punctuator token.
@@ -194,7 +206,7 @@ impl Delimiter {
     /// Returns the postfix binding power of the [Delimiter], if any.
     pub fn postfix_binding_power(&self) -> Option<(u8, ())> {
         match self {
-            Self::Paren => Some((1, ())),
+            Self::Paren => Some((2, ())),
             _ => None,
         }
     }
@@ -287,6 +299,15 @@ impl<'src> TokenTree<'src> {
     pub fn postfix_binding_power(&self) -> Option<(u8, ())> {
         match self {
             Self::Group(group) => group.delim().postfix_binding_power(),
+            _ => None,
+        }
+    }
+
+    /// Returns the postfix binding power of this [TokenTree] (if it can be used a prefix
+    /// operator).
+    pub fn prefix_binding_power(&self) -> Option<((), u8)> {
+        match self {
+            Self::Punct(punct) => punct.kind().prefix_binding_power(),
             _ => None,
         }
     }

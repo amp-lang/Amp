@@ -207,8 +207,19 @@ pub trait SyntaxDiagnostics: Report {
     }
 
     /// Reports that a return type was expected in a function declaration.
+    ///
+    /// # Params
+    /// 1. The span of the function declaration up until the type annotation.
     fn expected_function_return_type(&mut self, offending_span: Span) {
         self.report(Diag::new().error("expected function return type", Some(offending_span)))
+    }
+
+    /// Reports that an operator was found but no valid operand followed.
+    ///
+    /// # Params
+    /// 1. The span of the expression up until the operator.
+    fn expected_operand_expression(&mut self, offending_span: Span) {
+        self.report(Diag::new().error("expected expression as operand", Some(offending_span)))
     }
 }
 

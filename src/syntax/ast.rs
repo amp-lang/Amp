@@ -133,6 +133,7 @@ pub enum Expr {
     Const(Box<Const>),
     Return(Box<Return>),
     Func(Box<Func>),
+    Unary(Box<Unary>),
 }
 
 impl Expr {
@@ -173,13 +174,53 @@ impl Expr {
         Err(Recoverable::Yes)
     }
 
+    /// Parse prefix expressions (such as `&` or `-`) or an atom.
+    fn pratt_parse_prefix(cx: &mut Context, tokens: &mut TokenIter) -> Result<Self, Recoverable> {
+        let first = tokens.clone().next().ok_or(Recoverable::Yes)?;
+        let start_span = first.span();
+
+        let ((), r_bp) = match first.prefix_binding_power() {
+            Some(bp) => bp,
+            None => return Self::parse_atom(cx, tokens),
+        };
+
+        // iterate past operator
+        tokens.next();
+
+        let mut op = UnaryOp::from_token(first).unwrap();
+        if op == UnaryOp::Ref {
+            match tokens.peek() {
+                Some(TokenTree::Reserved(reserved)) if reserved.kind() == ReservedWord::Mut => {
+                    tokens.next();
+                    op = UnaryOp::RefMut
+                }
+                _ => {}
+            }
+        }
+
+        let operand = Self::pratt_parse(cx, tokens, r_bp).if_recoverable(|| {
+            cx.expected_operand_expression(start_span);
+            Recoverable::No
+        })?;
+
+        Ok(Self::Unary(Box::new(Unary {
+            span: Span::new(
+                start_span.file_id(),
+                start_span.start(),
+                operand.span().end(),
+            ),
+            op,
+            operand,
+        })))
+    }
+
     /// Parses a basic expression with a Pratt parser-style implementation.
     fn pratt_parse(
         cx: &mut Context,
         tokens: &mut TokenIter,
         min_bp: u8,
     ) -> Result<Self, Recoverable> {
-        let mut lhs = Self::parse_atom(cx, tokens)?;
+        let mut lhs = Self::pratt_parse_prefix(cx, tokens)?;
 
         loop {
             let op = match tokens.clone().next() {
@@ -244,6 +285,7 @@ impl Spanned for Expr {
             Self::Const(expr) => expr.span(),
             Self::Return(expr) => expr.span(),
             Self::Func(expr) => expr.span(),
+            Self::Unary(expr) => expr.span(),
         }
     }
 }
@@ -482,6 +524,39 @@ impl Func {
 }
 
 impl Spanned for Func {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+/// A unary operator.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum UnaryOp {
+    Ref,
+    RefMut,
+}
+
+impl UnaryOp {
+    pub fn from_token(token: &TokenTree) -> Option<Self> {
+        match token {
+            TokenTree::Punct(punct) => match punct.kind() {
+                PunctKind::And => Some(UnaryOp::Ref),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+}
+
+/// A unary expression.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Unary {
+    pub span: Span,
+    pub op: UnaryOp,
+    pub operand: Expr,
+}
+
+impl Spanned for Unary {
     fn span(&self) -> Span {
         self.span
     }

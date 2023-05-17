@@ -57,6 +57,9 @@ pub enum Token {
     /// `return`
     KReturn,
 
+    /// `mut`
+    KMut,
+
     /// A Unicode XID identifier token.
     Id,
 
@@ -211,6 +214,7 @@ impl<'cx, 'src> Scanner<'cx, 'src> {
             "const" => Token::KConst,
             "func" => Token::KFunc,
             "return" => Token::KReturn,
+            "mut" => Token::KMut,
             _ => Token::Id,
         }
     }
@@ -389,6 +393,7 @@ fn scan_token<'src>(scanner: &mut Scanner<'_, 'src>) -> Result<TokenTree<'src>, 
         Token::KConst => TokenTree::Reserved(Reserved::new(scanner.span(), ReservedWord::Const)),
         Token::KFunc => TokenTree::Reserved(Reserved::new(scanner.span(), ReservedWord::Func)),
         Token::KReturn => TokenTree::Reserved(Reserved::new(scanner.span(), ReservedWord::Return)),
+        Token::KMut => TokenTree::Reserved(Reserved::new(scanner.span(), ReservedWord::Mut)),
         Token::DecInt => TokenTree::Literal(Literal::new(
             scanner.span(),
             LiteralKind::DecInt,
