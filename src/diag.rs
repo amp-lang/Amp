@@ -196,6 +196,20 @@ pub trait SyntaxDiagnostics: Report {
     fn expected_semicolon(&mut self, offending_span: Span) {
         self.report(Diag::new().error("expected a semicolon", Some(offending_span)))
     }
+
+    /// Reports that an argument list was expected in a function declaration, such as
+    /// `func(my_param: i32): i32`.
+    ///
+    /// # Params
+    /// 1. The span of the offending `func` declaration, up to the name.
+    fn expected_function_args(&mut self, offending_span: Span) {
+        self.report(Diag::new().error("expected function argument list", Some(offending_span)))
+    }
+
+    /// Reports that a return type was expected in a function declaration.
+    fn expected_function_return_type(&mut self, offending_span: Span) {
+        self.report(Diag::new().error("expected function return type", Some(offending_span)))
+    }
 }
 
 impl<T: Report> SyntaxDiagnostics for T {}

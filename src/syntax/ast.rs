@@ -87,6 +87,12 @@ impl<T> Arglist<T> {
     }
 }
 
+impl<T> Spanned for Arglist<T> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
 /// A type annotation.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TypeAnnotation {
@@ -126,6 +132,7 @@ pub enum Expr {
     Call(Box<Call>),
     Const(Box<Const>),
     Return(Box<Return>),
+    Func(Box<Func>),
 }
 
 impl Expr {
@@ -153,6 +160,12 @@ impl Expr {
 
         match Int::parse(cx, tokens) {
             Ok(value) => return Ok(Self::Int(value)),
+            Err(Recoverable::No) => return Err(Recoverable::No),
+            Err(Recoverable::Yes) => {}
+        }
+
+        match Func::parse(cx, tokens) {
+            Ok(value) => return Ok(Self::Func(Box::new(value))),
             Err(Recoverable::No) => return Err(Recoverable::No),
             Err(Recoverable::Yes) => {}
         }
@@ -185,11 +198,13 @@ impl Expr {
 
             match op {
                 TokenTree::Group(group) if group.delim() == Delimiter::Paren => {
+                    let lhs_span = lhs.span();
+                    let args = Arglist::parse(cx, tokens, Expr::parse)
+                        .if_recoverable(|| unreachable!("should not be reachable"))?;
                     lhs = Self::Call(Box::new(Call {
-                        span: lhs.span(),
+                        span: Span::new(lhs_span.file_id(), lhs_span.start(), args.span().end()),
                         callee: lhs,
-                        args: Arglist::parse(cx, tokens, Expr::parse)
-                            .if_recoverable(|| unreachable!("should not be reachable"))?,
+                        args,
                     }));
                 }
                 _ => unreachable!(
@@ -228,6 +243,7 @@ impl Spanned for Expr {
             Self::Call(expr) => expr.span(),
             Self::Const(expr) => expr.span(),
             Self::Return(expr) => expr.span(),
+            Self::Func(expr) => expr.span(),
         }
     }
 }
@@ -333,6 +349,144 @@ impl Spanned for Call {
     }
 }
 
+/// A named [FuncParam].
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct NamedParam {
+    pub span: Span,
+    pub name: Id,
+    pub ty: TypeAnnotation,
+}
+
+impl NamedParam {
+    /// Parses a [NamedParam].
+    pub fn parse(cx: &mut Context, tokens: &mut TokenIter) -> Result<Self, Recoverable> {
+        // NOTE: named parameters must check for an identifier AND a colon to differentiate
+        // [NamedParam] from [Expr]s.
+        match tokens.peek_nth(0) {
+            Some(TokenTree::Literal(literal)) if literal.kind() == LiteralKind::Id => {}
+            _ => return Err(Recoverable::Yes),
+        }
+
+        match tokens.peek_nth(1) {
+            Some(TokenTree::Punct(punct)) if punct.kind() == PunctKind::Colon => {}
+            _ => return Err(Recoverable::Yes),
+        }
+
+        let name = Id::parse(cx, tokens).expect("should have been an identifier");
+
+        // note that any errors are unrecoverable, as we've confirmed that there is a type
+        // annotation previously.
+        let ty = TypeAnnotation::parse(cx, tokens)?;
+
+        Ok(Self {
+            span: Span::new(name.span().file_id(), name.span().start(), ty.span().end()),
+            name,
+            ty,
+        })
+    }
+}
+
+impl Spanned for NamedParam {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+/// A parameter of a [Func] expression.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum FuncParam {
+    /// A function parameter declared with a name.
+    Named(NamedParam),
+
+    /// An anonymous function parameter.
+    Anon(Expr),
+}
+
+impl FuncParam {
+    pub fn parse(cx: &mut Context, tokens: &mut TokenIter) -> Result<Self, Recoverable> {
+        match NamedParam::parse(cx, tokens) {
+            Ok(value) => return Ok(Self::Named(value)),
+            Err(Recoverable::No) => return Err(Recoverable::No),
+            Err(Recoverable::Yes) => {}
+        }
+
+        Ok(Self::Anon(Expr::parse(cx, tokens)?))
+    }
+}
+
+impl Spanned for FuncParam {
+    fn span(&self) -> Span {
+        match self {
+            Self::Named(param) => param.span(),
+            Self::Anon(param) => param.span(),
+        }
+    }
+}
+
+/// A `func` value.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Func {
+    pub span: Span,
+    pub name: Option<Id>,
+    pub args: Arglist<FuncParam>,
+    pub returns: TypeAnnotation,
+    pub block: Option<Block>,
+}
+
+impl Func {
+    /// Parses a [Func] value.
+    pub fn parse(cx: &mut Context, tokens: &mut TokenIter) -> Result<Self, Recoverable> {
+        let start_span = tokens.expect_reserved(ReservedWord::Func)?.span();
+
+        let name = match Id::parse(cx, tokens) {
+            Ok(name) => Some(name),
+            Err(Recoverable::Yes) => None,
+            Err(Recoverable::No) => return Err(Recoverable::No),
+        };
+
+        let args = Arglist::parse(cx, tokens, FuncParam::parse).if_recoverable(|| {
+            cx.expected_function_args(Span::new(
+                start_span.file_id(),
+                start_span.start(),
+                match &name {
+                    Some(name) => name.span().end(),
+                    None => start_span.end(),
+                },
+            ));
+            Recoverable::No
+        })?;
+
+        let returns = TypeAnnotation::parse(cx, tokens).if_recoverable(|| {
+            cx.expected_function_return_type(Span::new(
+                start_span.file_id(),
+                start_span.start(),
+                args.span().end(),
+            ));
+            Recoverable::No
+        })?;
+
+        let block = match Block::parse(cx, tokens) {
+            Ok(block) => Some(block),
+            Err(Recoverable::Yes) => None,
+            Err(Recoverable::No) => return Err(Recoverable::No),
+        };
+
+        Ok(Self {
+            span: start_span,
+            name,
+            args,
+            returns,
+            block,
+        })
+    }
+}
+
+impl Spanned for Func {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
 // Statements
 
 /// A list of semicolon-terminated statements.
@@ -423,6 +577,7 @@ pub struct Const {
     pub span: Span,
     pub name: Id,
     pub ty: Option<TypeAnnotation>,
+    pub value: Expr,
 }
 
 impl Const {
@@ -441,22 +596,35 @@ impl Const {
             Err(Recoverable::No) => return Err(Recoverable::No),
         };
 
-        tokens.expect_punct(PunctKind::Eq).if_recoverable(|| {
+        let eq_span = tokens
+            .expect_punct(PunctKind::Eq)
+            .if_recoverable(|| {
+                cx.expected_const_binding_value(Span::new(
+                    start_span.file_id(),
+                    start_span.start(),
+                    match &ty {
+                        Some(end) => end.span().end(),
+                        None => name.span().end(),
+                    },
+                ));
+                Recoverable::No
+            })?
+            .span();
+
+        let value = Expr::parse(cx, tokens).if_recoverable(|| {
             cx.expected_const_binding_value(Span::new(
                 start_span.file_id(),
                 start_span.start(),
-                match &ty {
-                    Some(end) => end.span().end(),
-                    None => name.span().end(),
-                },
+                eq_span.end(),
             ));
             Recoverable::No
         })?;
 
         Ok(Self {
-            span: start_span,
+            span: Span::new(start_span.file_id(), start_span.start(), value.span().end()),
             name,
             ty,
+            value,
         })
     }
 }

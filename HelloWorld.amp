@@ -1,2 +1,3 @@
-Printf("Hello, world!");
-return 0;
+const MyNum = func(): i32 {
+    return 0;
+};
