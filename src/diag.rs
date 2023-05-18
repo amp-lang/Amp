@@ -250,6 +250,18 @@ pub trait SemaDiagnostics: Report {
 
         self.report(diag)
     }
+
+    /// Reports that a named value could not be found.
+    ///
+    /// # Params
+    /// 1. The name of the requested value.
+    /// 2. The span of the requested value.
+    fn could_not_resolve_name(&mut self, name: &str, offending_span: Span) {
+        self.report(Diag::new().error(
+            format!("could not resolve '{}'", name),
+            Some(offending_span),
+        ))
+    }
 }
 
 impl<T: Report> SemaDiagnostics for T {}

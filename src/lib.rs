@@ -7,5 +7,7 @@ mod context;
 pub mod diag;
 pub mod sema;
 pub mod syntax;
+pub mod types;
+pub mod value;
 
 pub use context::*;

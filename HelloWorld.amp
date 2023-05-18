@@ -1,8 +1,2 @@
-const Printf = func printf(format: &u8): i32;
-
-const Main = func main(): i32 {
-    Printf("Hello, world!");
-    return 0;
-};
-
-const Main = func(): void;
+const MyType: type = type;
+const MyValue: MyType = i32;

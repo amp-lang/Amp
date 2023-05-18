@@ -9,8 +9,11 @@
 //!
 //! 1. Declare the names of root `const` bindings, ensuring there are no duplicate names.
 //!    Disregard type/value information at this phase, as it's not important.
+//! (note: there would be a pass here to evaluate `where` statements in the root of a module, which
+//! would lazily evaluate any `const` values)
 //! 2. Evaluate the types and values as of global `const` bindings.
 
+pub mod air;
 pub mod scope;
 
 use slot_arena::SlotArena;
@@ -19,6 +22,8 @@ use crate::{
     codemap::{Span, Spanned},
     diag::SemaDiagnostics,
     syntax::ast,
+    types::Type,
+    value::Value,
     Context,
 };
 
@@ -49,17 +54,50 @@ impl Unit {
         }
     }
 
+    /// Initializes the provided scope with Amp primitives, such as the `i32` and `u8` types.
+    ///
+    /// Should only be called once per [Unit], to prevent memory leaks.
+    pub fn initialize_scope_with_primitives(&mut self, scope: &mut Scope) {
+        {
+            let type_ = self.consts.insert(Const {
+                name: "type".into(),
+                span: None,
+                value: Some((Type::Type, Value::Type(Type::Type))),
+            });
+            scope.insert("type", ScopedRef::Const(type_));
+        }
+
+        {
+            let u8 = self.consts.insert(Const {
+                name: "u8".into(),
+                span: None,
+                value: Some((Type::Type, Value::Type(Type::U8))),
+            });
+            scope.insert("u8", ScopedRef::Const(u8));
+        }
+
+        {
+            let i32 = self.consts.insert(Const {
+                name: "i32".into(),
+                span: None,
+                value: Some((Type::Type, Value::Type(Type::I32))),
+            });
+            scope.insert("i32", ScopedRef::Const(i32));
+        }
+    }
+
     /// Analyzes the provided module, lowering it to AIR.
+    ///
+    /// Should only be called once per [Unit].  TODO: return the produced AIR.
     pub fn analyze(&mut self, cx: &mut Context, source: ast::Stmnts) -> Result<(), ()> {
-        let global_scope = Scope::new();
+        let mut global_scope = Scope::new();
+        self.initialize_scope_with_primitives(&mut global_scope);
 
         let mut module = Module::new(source);
         module.scope_mut().parent(Some(&global_scope));
 
-        {
-            module.declare_root_const_names(cx, self)?;
-            module
-        };
+        module.declare_root_const_names(cx, self)?;
+        module.define_root_const_values(cx, self)?;
 
         Ok(())
     }
@@ -120,6 +158,7 @@ impl<'root> Module<'root> {
                         let id = unit.consts.insert(Const {
                             span: Some(decl.span()),
                             name: decl.name.value.clone(),
+                            value: None,
                         });
                         self.scope.insert(&decl.name.value, ScopedRef::Const(id));
                     }
@@ -129,6 +168,55 @@ impl<'root> Module<'root> {
         }
 
         res
+    }
+
+    /// Defines the values of `const` declarations in the root.
+    pub fn define_root_const_values(
+        &mut self,
+        cx: &mut Context,
+        unit: &mut Unit,
+    ) -> Result<(), ()> {
+        for item in &self.source.stmnts {
+            match item {
+                ast::Expr::Const(decl) => {
+                    let ScopedRef::Const(const_id) = self
+                        .scope
+                        .get(&decl.name.value)
+                        .expect("verified in last pass");
+
+                    if unit.consts.get(const_id).value.is_none() {
+                        // TODO: move `const` value evaluation to separate method
+                        let intermediate =
+                            IntermediateExpr::verify(cx, unit, &self.scope, &decl.value)?;
+
+                        let (ty, expr) = if let Some(ty) = &decl.ty {
+                            let Value::Type(final_ty) = Value::eval(
+                                IntermediateExpr::verify(cx, unit, &self.scope, &ty.ty)?
+                                    .coerce(&Type::Type)
+                                    .expect("TODO: report this"),
+                            )
+                            .expect("TODO: report this");
+
+                            let final_value =
+                                intermediate.coerce(&final_ty).expect("TODO: report this");
+
+                            (final_ty.clone(), final_value)
+                        } else {
+                            (
+                                intermediate.default_type(),
+                                intermediate.infer().expect("TODO: report this"),
+                            )
+                        };
+
+                        unit.consts.get_mut(const_id).value =
+                            Some((ty, Value::eval(expr).expect("TODO: report this")))
+                    }
+                }
+                _ => todo!("throw error when invalid items are found"),
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -141,4 +229,76 @@ pub struct Const {
 
     /// The name of the declaration.
     pub name: String,
+
+    /// The value of the constant.  [`None`] if it has not been initialized yet.  All constants
+    /// should be initialized past the `define_root_const_values` pass, and this can be `unwrap`ed.
+    pub value: Option<(Type, Value)>,
+}
+
+/// An AIR expression which has not yet been assigned a specific type.
+///
+/// Used to infer the type of a value for a variable, especially for literals such as integers and
+/// floats which have multiple possible types.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum IntermediateExpr {
+    /// Any compile time known value.
+    Const(Type, Value),
+}
+
+impl IntermediateExpr {
+    /// Attempts to verify that the provided AST expression is a valid AIR expression.
+    pub fn verify(
+        cx: &mut Context,
+        unit: &mut Unit,
+        scope: &Scope,
+        expr: &ast::Expr,
+    ) -> Result<Self, ()> {
+        match expr {
+            ast::Expr::Id(id) => {
+                // TODO: move to separate method
+                if let Some(value) = scope.find(&id.value) {
+                    match value {
+                        ScopedRef::Const(const_id) => {
+                            let const_ = unit.consts.get(const_id);
+                            let value = const_
+                                .value
+                                .clone()
+                                .expect("TODO: evaluate value if not defined");
+                            Ok(Self::Const(value.0, value.1))
+                        }
+                    }
+                } else {
+                    cx.could_not_resolve_name(&id.value, id.span());
+                    return Err(());
+                }
+            }
+            _ => todo!("implement other expressions"),
+        }
+    }
+
+    /// Attempts to coerce the [IntermediateExpr] into the provided type.
+    pub fn coerce(self, expected_type: &Type) -> Option<air::Expr> {
+        match (self, expected_type) {
+            (Self::Const(ty, value), expected_type) if ty.is_equivalent(&expected_type) => {
+                Some(air::Expr::Const(ty, value))
+            }
+            _ => None,
+        }
+    }
+
+    /// Attempts to provide a default type for this [IntermediateExpr].
+    ///
+    /// Values such as `uninit` which cannot have a known type cannot be inferred.
+    pub fn infer(self) -> Option<air::Expr> {
+        match self {
+            Self::Const(ty, value) => Some(air::Expr::Const(ty, value)),
+        }
+    }
+
+    /// Returns the default [Type] for an intermediate expression.
+    pub fn default_type(&self) -> Type {
+        match self {
+            Self::Const(ty, _) => ty.clone(),
+        }
+    }
 }
