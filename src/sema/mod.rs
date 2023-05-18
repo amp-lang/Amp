@@ -203,7 +203,7 @@ impl<'root> Module<'root> {
                             (final_ty.clone(), final_value)
                         } else {
                             (
-                                intermediate.default_type(),
+                                intermediate.default_type().expect("uninit not implemented"),
                                 intermediate.infer().expect("TODO: report this"),
                             )
                         };
@@ -289,16 +289,26 @@ impl IntermediateExpr {
     /// Attempts to provide a default type for this [IntermediateExpr].
     ///
     /// Values such as `uninit` which cannot have a known type cannot be inferred.
+    ///
+    /// Essentially a shorthand for:
+    ///
+    /// ```no_run
+    /// # use ampc::sema::air;
+    /// # use ampc::sema::IntermediateExpr;
+    /// # fn _test(intermediate_expr: IntermediateExpr) -> Option<air::Expr> {
+    /// let ty = intermediate_expr.default_type()?;
+    /// intermediate_expr.coerce(&ty)
+    /// # }
+    /// ```
     pub fn infer(self) -> Option<air::Expr> {
-        match self {
-            Self::Const(ty, value) => Some(air::Expr::Const(ty, value)),
-        }
+        let ty = self.default_type()?;
+        self.coerce(&ty)
     }
 
     /// Returns the default [Type] for an intermediate expression.
-    pub fn default_type(&self) -> Type {
+    pub fn default_type(&self) -> Option<Type> {
         match self {
-            Self::Const(ty, _) => ty.clone(),
+            Self::Const(ty, _) => Some(ty.clone()),
         }
     }
 }
