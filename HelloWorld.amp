@@ -1,3 +1,5 @@
-const MyType = i32;
-const MyValue: MyType = 42;
-const MyValue2 = 42;
+const I32_T = i32;
+const I32: I32_T = 42;
+
+const U8_T = u8;
+const U8: U8_T = 42;

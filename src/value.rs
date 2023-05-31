@@ -5,6 +5,9 @@ use crate::{sema::air, types::Type};
 /// A value known at compile-time.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Value {
+    /// A constant [u8] value, whose type is always [`Type::U8`].
+    U8(u8),
+
     /// A constant [i32] value, whose type is always [`Type::I32`].
     I32(i32),
 

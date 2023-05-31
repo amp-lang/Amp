@@ -295,8 +295,8 @@ impl IntermediateExpr {
                 Some(air::Expr::Const(
                     expected_type.clone(),
                     match expected_type {
-                        Type::U8 => todo!("u8 value literals"),
                         // TODO: check if value fits
+                        Type::U8 => Value::U8(value as u8),
                         Type::I32 => Value::I32(value as i32),
                         _ => unreachable!("should be an integer type"),
                     },
@@ -331,6 +331,7 @@ impl IntermediateExpr {
     /// Returns the default [Type] for an intermediate expression.
     pub fn default_type(&self) -> Option<Type> {
         match self {
+            // TODO: pick a type other than i32 if the literal type is too large.
             Self::ImmInt(_) => Some(Type::I32), // use `i32` as default type for integers
             Self::Const(ty, _) => Some(ty.clone()),
         }
