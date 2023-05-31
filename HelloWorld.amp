@@ -1,1 +1,3 @@
 const MyType = i32;
+const MyValue: MyType = 42;
+const MyValue2 = 42;

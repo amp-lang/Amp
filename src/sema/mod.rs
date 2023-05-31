@@ -192,10 +192,14 @@ impl<'root> Module<'root> {
                         let (ty, expr) = if let Some(ty) = &decl.ty {
                             let Value::Type(final_ty) = Value::eval(
                                 IntermediateExpr::verify(cx, unit, &self.scope, &ty.ty)?
+                                    // verify that the value is a type
                                     .coerce(&Type::Type)
-                                    .expect("TODO: report this"),
+                                    .expect("TODO: report non-type in type position"),
                             )
-                            .expect("TODO: report this");
+                            .expect("TODO: report non-constant type")
+                            else { 
+                                unreachable!("value should be of type `type` as verified above")
+                            };
 
                             let final_value =
                                 intermediate.coerce(&final_ty).expect("TODO: report this");
@@ -241,7 +245,13 @@ pub struct Const {
 /// floats which have multiple possible types.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum IntermediateExpr {
-    /// Any compile time known value.
+    /// An immediate integer value which has not yet been assigned a specific type.
+    ///
+    /// When converted into an AIR expression, it uses [`air::Expr::Const`] as both the type and
+    /// value have been determined.
+    ImmInt(u64),
+
+    /// Any compile time known value with a known type.
     Const(Type, Value),
 }
 
@@ -263,7 +273,7 @@ impl IntermediateExpr {
                             let value = const_
                                 .value
                                 .clone()
-                                .expect("TODO: evaluate value if not defined");
+                                .expect("TODO: evaluate value if not defined (values shouldn't need to be used in order)");
                             Ok(Self::Const(value.0, value.1))
                         }
                     }
@@ -272,6 +282,7 @@ impl IntermediateExpr {
                     return Err(());
                 }
             }
+            ast::Expr::Int(int) => Ok(Self::ImmInt(int.value)),
             _ => todo!("implement other expressions"),
         }
     }
@@ -279,6 +290,18 @@ impl IntermediateExpr {
     /// Attempts to coerce the [IntermediateExpr] into the provided type.
     pub fn coerce(self, expected_type: &Type) -> Option<air::Expr> {
         match (self, expected_type) {
+            (Self::ImmInt(value), expected_type) if expected_type.is_int() => {
+                // TODO: possibly move to separate method
+                Some(air::Expr::Const(
+                    expected_type.clone(),
+                    match expected_type {
+                        Type::U8 => todo!("u8 value literals"),
+                        // TODO: check if value fits
+                        Type::I32 => Value::I32(value as i32),
+                        _ => unreachable!("should be an integer type"),
+                    },
+                ))
+            }
             (Self::Const(ty, value), expected_type) if ty.is_equivalent(&expected_type) => {
                 Some(air::Expr::Const(ty, value))
             }
@@ -308,6 +331,7 @@ impl IntermediateExpr {
     /// Returns the default [Type] for an intermediate expression.
     pub fn default_type(&self) -> Option<Type> {
         match self {
+            Self::ImmInt(_) => Some(Type::I32), // use `i32` as default type for integers
             Self::Const(ty, _) => Some(ty.clone()),
         }
     }

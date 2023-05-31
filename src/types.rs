@@ -51,4 +51,12 @@ impl Type {
             _ => false,
         }
     }
+
+    /// Returns `true` if this type is an integer type.
+    pub fn is_int(&self) -> bool {
+        match self {
+            Type::U8 | Type::I32 => true,
+            _ => false,
+        }
+    }
 }
