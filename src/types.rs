@@ -1,3 +1,9 @@
+use crate::{
+    sema::{scope::Scope, Unit, IntermediateExpr},
+    syntax::ast,
+    Context, value::Value,
+};
+
 /// The mutability of a pointer.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]
@@ -21,6 +27,41 @@ impl ThinPtr {
     }
 }
 
+/// The signature/type of a function.
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct FuncSig {
+    pub params: Vec<Type>,
+    pub returns: Type,
+}
+
+impl FuncSig {
+    /// Returns `true` if this [FuncSig] type is equivalent to the provided [FuncSig] type.
+    ///
+    /// Argument order matters, for example, `func(&mut T)` is equivalent to `func(&T)`, but
+    /// `func(&T)` is not equivalent to `func(&mut T)`.
+    pub fn is_equivalent(&self, other: &FuncSig) -> bool {
+        if other.params.len() != self.params.len() {
+            false
+        } else {
+            self.params
+                .iter()
+                .zip(other.params.iter())
+                .all(|(left, right)| left.is_equivalent(right))
+                && self.returns.is_equivalent(&other.returns)
+        }
+    }
+
+    /// Attempts to get the signature of a function from an AST expression.
+    pub fn from_ast(
+        cx: &mut Context,
+        unit: &Unit,
+        scope: &Scope,
+        expr: &ast::Func,
+    ) -> Result<Self, ()> {
+        todo!()
+    }
+}
+
 /// The type of a value in Amp.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Type {
@@ -28,6 +69,7 @@ pub enum Type {
     U8,
     I32,
     ThinPtr(Box<ThinPtr>),
+    Func(Box<FuncSig>),
 }
 
 impl Type {
@@ -48,6 +90,7 @@ impl Type {
             (Type::U8, Type::U8) => true,
             (Type::I32, Type::I32) => true,
             (Type::ThinPtr(left), Type::ThinPtr(right)) => left.is_equivalent(right),
+            (Type::Func(left), Type::Func(right)) => left.is_equivalent(right),
             _ => false,
         }
     }
@@ -58,5 +101,26 @@ impl Type {
             Type::U8 | Type::I32 => true,
             _ => false,
         }
+    }
+
+    /// Attempts to resolve a constant type value from the provided expression.
+    pub fn from_ast(
+        cx: &mut Context,
+        unit: &mut Unit,
+        scope: &Scope,
+        expr: &ast::Expr,
+    ) -> Result<Self, ()> {
+        let Value::Type(final_ty) = Value::eval(
+            IntermediateExpr::verify(cx, unit, scope, expr)?
+                // verify that the value is a type
+                .coerce(&Type::Type)
+                .expect("TODO: report non-type in type position"),
+        )
+        .expect("TODO: report non-constant type")
+        else { 
+            unreachable!("value should be of type `type` as verified above")
+        };
+
+        Ok(final_ty)
     }
 }

@@ -189,28 +189,18 @@ impl<'root> Module<'root> {
                         let intermediate =
                             IntermediateExpr::verify(cx, unit, &self.scope, &decl.value)?;
 
-                        let (ty, expr) = if let Some(ty) = &decl.ty {
-                            let Value::Type(final_ty) = Value::eval(
-                                IntermediateExpr::verify(cx, unit, &self.scope, &ty.ty)?
-                                    // verify that the value is a type
-                                    .coerce(&Type::Type)
-                                    .expect("TODO: report non-type in type position"),
-                            )
-                            .expect("TODO: report non-constant type")
-                            else { 
-                                unreachable!("value should be of type `type` as verified above")
-                            };
-
-                            let final_value =
-                                intermediate.coerce(&final_ty).expect("TODO: report this");
-
-                            (final_ty.clone(), final_value)
+                        let ty = if let Some(ty) = &decl.ty {
+                            let final_ty = Type::from_ast(cx, unit, &self.scope, &ty.ty)?;
+                            final_ty
                         } else {
-                            (
-                                intermediate.default_type().expect("uninit not implemented"),
-                                intermediate.infer().expect("TODO: report this"),
-                            )
+                            intermediate
+                                .default_type()
+                                .expect("TODO: uninit not implemented")
                         };
+
+                        let expr = intermediate
+                            .coerce(&ty)
+                            .expect("TODO: report `const` type mismatch");
 
                         unit.consts.get_mut(const_id).value =
                             Some((ty, Value::eval(expr).expect("TODO: report this")))
@@ -283,6 +273,14 @@ impl IntermediateExpr {
                 }
             }
             ast::Expr::Int(int) => Ok(Self::ImmInt(int.value)),
+            ast::Expr::Func(func) => {
+                if func.name.is_none() && func.block.is_none() {
+                    // it's a function type, rather than a function value.
+                    todo!("function types")
+                } else {
+                    todo!("implement function values")
+                }
+            }
             _ => todo!("implement other expressions"),
         }
     }
