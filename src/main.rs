@@ -1,4 +1,4 @@
-use std::process::ExitCode;
+use std::{process::ExitCode, time::Instant};
 
 use ampc::{
     sema,
@@ -7,6 +7,7 @@ use ampc::{
 };
 
 fn main() -> ExitCode {
+    let start_time = Instant::now();
     let mut cx = Context::new();
     let file_id = cx.add_file(
         "HelloWorld.amp",
@@ -48,6 +49,10 @@ fn main() -> ExitCode {
         }
     };
 
+    println!(
+        "Finished in {}ms",
+        start_time.elapsed().as_nanos() as f64 / 1_000_000f64
+    );
     dbg!(unit);
 
     ExitCode::SUCCESS

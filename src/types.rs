@@ -54,11 +54,23 @@ impl FuncSig {
     /// Attempts to get the signature of a function from an AST expression.
     pub fn from_ast(
         cx: &mut Context,
-        unit: &Unit,
+        unit: &mut Unit,
         scope: &Scope,
         expr: &ast::Func,
     ) -> Result<Self, ()> {
-        todo!()
+        let mut params = Vec::new();
+
+        for arg in &expr.args.items {
+            params.push(match arg {
+                ast::FuncParam::Anon(arg) => Type::from_ast(cx, unit, scope, &arg)?,
+                ast::FuncParam::Named(ast::NamedParam { ty, .. }) => Type::from_ast(cx, unit, scope, &ty.ty)?,
+            });
+        }
+
+        Ok(Self {
+            params,
+            returns: Type::from_ast(cx, unit, scope, &expr.returns.ty)?,
+        })
     }
 }
 

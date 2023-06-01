@@ -22,7 +22,7 @@ use crate::{
     codemap::{Span, Spanned},
     diag::SemaDiagnostics,
     syntax::ast,
-    types::Type,
+    types::{FuncSig, Type},
     value::Value,
     Context,
 };
@@ -276,7 +276,12 @@ impl IntermediateExpr {
             ast::Expr::Func(func) => {
                 if func.name.is_none() && func.block.is_none() {
                     // it's a function type, rather than a function value.
-                    todo!("function types")
+                    Ok(Self::Const(
+                        Type::Type,
+                        Value::Type(Type::Func(Box::new(FuncSig::from_ast(
+                            cx, unit, scope, &func,
+                        )?))),
+                    ))
                 } else {
                     todo!("implement function values")
                 }
