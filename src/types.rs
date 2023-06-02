@@ -1,7 +1,7 @@
 use crate::{
     sema::{scope::Scope, Unit, IntermediateExpr},
     syntax::ast,
-    Context, value::Value,
+    Context, value::Value, diag::SemaDiagnostics, codemap::Spanned,
 };
 
 /// The mutability of a pointer.
@@ -24,6 +24,11 @@ impl ThinPtr {
     #[inline]
     pub fn is_equivalent(&self, other: &ThinPtr) -> bool {
         self.0 >= other.0 && self.1.is_equivalent(&other.1)
+    }
+
+    /// Returns the name of the [ThinPtr] type.
+    pub fn name(&self) -> String {
+        format!("&{}{}", if self.0 == Mutable::Yes { "mut " } else { "" }, self.1.name())
     }
 }
 
@@ -49,6 +54,15 @@ impl FuncSig {
                 .all(|(left, right)| left == right)
                 && self.returns.is_equivalent(&other.returns)
         }
+    }
+
+    /// Returns the name of this type.
+    pub fn name(&self) -> String {
+        format!(
+            "func({}): {}", 
+            self.params.iter().map(|item| item.name()).collect::<Vec<_>>().join(", "),
+            self.returns.name()
+        )
     }
 
     /// Attempts to get the signature of a function from an AST expression.
@@ -92,6 +106,17 @@ impl Type {
         Self::ThinPtr(Box::new(ThinPtr(mutable, ty)))
     }
 
+    /// Returns the name of this [Type].
+    pub fn name(&self) -> String {
+        match self {
+            Self::Type => "type".to_string(),
+            Self::U8 => "u8".to_string(),
+            Self::I32 => "i32".to_string(),
+            Self::ThinPtr(ty) => ty.name(),
+            Self::Func(ty) => ty.name(),
+        }
+    }
+
     /// Returns `true` if this type is equivalent to another type.
     ///
     /// Argument order matters, for example, `&mut T` is equivalent to `&T`, but `&T` is not
@@ -122,13 +147,18 @@ impl Type {
         scope: &Scope,
         expr: &ast::Expr,
     ) -> Result<Self, ()> {
-        let Value::Type(final_ty) = Value::eval(
-            IntermediateExpr::verify(cx, unit, scope, expr)?
-                // verify that the value is a type
-                .coerce(&Type::Type)
-                .expect("TODO: report non-type in type position"),
-        )
-        .expect("TODO: report non-constant type")
+        let Value::Type(final_ty) = Value::eval({
+            let value = IntermediateExpr::verify(cx, unit, scope, expr)?;
+            
+            value.clone()
+            // verify that the value is a type
+            .coerce(&Type::Type)
+            .ok_or_else(|| cx.invalid_type_in_type_position(
+                &value.default_type().expect("must have a type").name(),
+                expr.span()
+            ))?
+        })
+        .expect("TODO: types can only be constant")
         else { 
             unreachable!("value should be of type `type` as verified above")
         };

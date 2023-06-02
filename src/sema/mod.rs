@@ -437,7 +437,7 @@ impl IntermediateExpr {
                 ))
             }
             ast::Expr::Call(call) => {
-                todo!("function calls");
+                todo!("function calls as expressions");
                 // Ok(Self::Call(unit.analyze_call(cx, scope, call)?))
             }
             _ => todo!("implement other expressions"),

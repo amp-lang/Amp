@@ -1,4 +1,4 @@
-const Printf = func printf(&u8): i32;
+const Printf: 42 = func printf(&u8): i32;
 
 const Main = func main(): i32 {
     Printf("Hello, world!");

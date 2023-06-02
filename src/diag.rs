@@ -262,6 +262,39 @@ pub trait SemaDiagnostics: Report {
             Some(offending_span),
         ))
     }
+
+    /// Creates the base for a type mismatch error.
+    ///
+    /// # Params
+    /// 1. The name of the expected type.
+    /// 2. The name of the type which was found.
+    /// 3. The span where the value of the invalid type was found.
+    fn type_mismatch_base(
+        &mut self,
+        expected_type: &str,
+        got_type: &str,
+        offending_span: Span,
+    ) -> Diag {
+        Diag::new().error(
+            format!(
+                "expected value of type `{}`, got `{}`",
+                expected_type, got_type
+            ),
+            Some(offending_span),
+        )
+    }
+
+    /// A value was used in a type's position.
+    ///
+    /// # Params
+    /// 1. The name of the type which was found.
+    /// 2. The span where the type value was expected.
+    fn invalid_type_in_type_position(&mut self, got_type: &str, offending_span: Span) {
+        let diag = self
+            .type_mismatch_base("type", got_type, offending_span)
+            .note("values cannot be used in a type's position", None);
+        self.report(diag);
+    }
 }
 
 impl<T: Report> SemaDiagnostics for T {}
