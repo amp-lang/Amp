@@ -5,7 +5,7 @@ use slot_arena::Ref;
 use crate::{sema::air, types::Type};
 
 /// A generic identifier for a function.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FuncId(pub u32);
 
 impl FuncId {

@@ -4,6 +4,7 @@
 
 #![feature(box_patterns)]
 
+pub mod clif;
 pub mod codemap;
 mod context;
 pub mod diag;

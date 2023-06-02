@@ -9,5 +9,10 @@ name = "ampc"
 
 [dependencies]
 codespan-reporting = { path = "./codespan-reporting" }
+cranelift = "0.94.0"
+cranelift-module = "0.94.0"
+cranelift-native = "0.94.0"
+cranelift-object = "0.94.0"
 slot-arena = "0.1.0"
+target-lexicon = "0.12.6"
 unicode-xid = "0.2.4"

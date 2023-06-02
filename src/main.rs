@@ -1,6 +1,7 @@
 use std::{process::ExitCode, time::Instant};
 
 use ampc::{
+    clif::compile_air_to_obj_file,
     sema,
     syntax::{self, ast::Stmnts},
     Context,
@@ -49,8 +50,10 @@ fn main() -> ExitCode {
         }
     };
 
+    let obj = compile_air_to_obj_file(air);
+    std::fs::write("HelloWorld.o", obj).unwrap();
+
     let elapsed = start_time.elapsed().as_nanos() as f64 / 1_000_000f64;
-    dbg!(air);
     println!("Finished in {}ms", elapsed);
 
     ExitCode::SUCCESS
