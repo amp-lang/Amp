@@ -16,7 +16,7 @@
 pub mod air;
 pub mod scope;
 
-use slot_arena::SlotArena;
+use slot_arena::{Ref, SlotArena};
 
 use crate::{
     codemap::{Span, Spanned},
@@ -27,7 +27,10 @@ use crate::{
     Context,
 };
 
-use self::scope::{Scope, ScopedRef};
+use self::{
+    air::Stmnt,
+    scope::{Scope, ScopedRef},
+};
 
 /// The state of the semantic analysis unit.
 ///
@@ -53,6 +56,11 @@ pub struct Unit {
 
     /// The functions declared in this [Unit].
     pub funcs: SlotArena<air::Func>,
+
+    /// The function currently being evaluated.
+    ///
+    /// Should not be changed outside of the [Module] implementation.
+    pub current_func: Ref<air::Func>,
 }
 
 impl Unit {
@@ -62,6 +70,7 @@ impl Unit {
         Self {
             consts: SlotArena::new(),
             funcs: SlotArena::new(),
+            current_func: Ref::from_raw(0),
         }
     }
 
@@ -118,6 +127,40 @@ impl Unit {
         module.define_root_const_values(cx, self)?;
 
         Ok(())
+    }
+
+    /// Analyzes the provided statement, converting it into AIR.
+    pub fn analyze_stmnt(
+        &mut self,
+        cx: &mut Context,
+        scope: &mut Scope,
+        stmnt: &ast::Expr,
+    ) -> Result<air::Stmnt, ()> {
+        match stmnt {
+            ast::Expr::Return(expr) => Ok(air::Stmnt::Return(air::Return::from_ast(
+                cx, self, scope, expr,
+            )?)),
+            _ => todo!("report expressions that aren't supported as statements"),
+        }
+    }
+
+    /// Analyzes a block of code.
+    ///
+    /// Creates a subscope from the provided scope.
+    pub fn analyze_block(
+        &mut self,
+        cx: &mut Context,
+        scope: &Scope,
+        block: &ast::Block,
+    ) -> Result<Vec<Stmnt>, ()> {
+        let mut scope = scope.subscope();
+        let mut stmnts = Vec::new();
+
+        for stmnt in &block.stmnts.stmnts {
+            stmnts.push(self.analyze_stmnt(cx, &mut scope, stmnt)?);
+        }
+
+        Ok(stmnts)
     }
 }
 
@@ -310,8 +353,18 @@ impl IntermediateExpr {
                     // the function was not already defined and that the two signatures are
                     // equivalent to eachother.
 
-                    let func_value = air::Func { extern_name };
+                    let func_value = air::Func {
+                        signature: sig.clone(),
+                        extern_name,
+                        def: None,
+                    };
                     let func_ref = unit.funcs.insert(func_value);
+                    unit.current_func = func_ref;
+
+                    if let Some(block) = &func.block {
+                        let insts = unit.analyze_block(cx, scope, block)?;
+                        unit.funcs.get_mut(func_ref).def = Some(air::FuncDef { insts });
+                    }
 
                     Ok(Self::Const(
                         Type::Func(Box::new(sig)),

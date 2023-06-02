@@ -1,1 +1,5 @@
-const Printf = func printf(&u8): i32;
+const Res = 42;
+
+const Main = func main(): i32 {
+    return Res;
+};

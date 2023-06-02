@@ -37,8 +37,8 @@ pub struct FuncSig {
 impl FuncSig {
     /// Returns `true` if this [FuncSig] type is equivalent to the provided [FuncSig] type.
     ///
-    /// Argument order matters, for example, `func(&mut T)` is equivalent to `func(&T)`, but
-    /// `func(&T)` is not equivalent to `func(&mut T)`.
+    /// Argument order matters, for example,  `func(T, ...)` is equivalent to `func(T)`, but not
+    /// the other way around.
     pub fn is_equivalent(&self, other: &FuncSig) -> bool {
         if other.params.len() != self.params.len() {
             false
@@ -46,7 +46,7 @@ impl FuncSig {
             self.params
                 .iter()
                 .zip(other.params.iter())
-                .all(|(left, right)| left.is_equivalent(right))
+                .all(|(left, right)| left == right)
                 && self.returns.is_equivalent(&other.returns)
         }
     }
