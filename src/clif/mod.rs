@@ -155,7 +155,7 @@ impl<Module: cranelift_module::Module> ClifBackend<Module> {
                 // TODO: functions as values
                 _ => None,
             },
-            _ => todo!("lower function calls"),
+            _ => todo!("lower function call expression"),
         }
     }
 
