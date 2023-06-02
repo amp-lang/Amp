@@ -19,14 +19,18 @@ impl FuncId {
 /// A value known at compile-time.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Value {
+    /// A `type` value, whose type is always [`Type::Type`].
+    Type(Type),
+
     /// A constant [u8] value, whose type is always [`Type::U8`].
     U8(u8),
 
     /// A constant [i32] value, whose type is always [`Type::I32`].
     I32(i32),
 
-    /// A `type` value, whose type is always [`Type::Type`].
-    Type(Type),
+    /// A null-terminated string value.  Note that the compiler representation of the string
+    /// (before it is outputted to an object file) is not null-terminated.
+    Nullterm(String),
 
     /// A function value.
     ///

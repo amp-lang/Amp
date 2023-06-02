@@ -386,6 +386,10 @@ impl IntermediateExpr {
                     Box::new(IntermediateExpr::verify(cx, unit, scope, operand)?),
                 ))
             }
+            ast::Expr::Str(str) => Ok(Self::Const(
+                Type::thin_ptr(Mutable::Yes, Type::U8),
+                Value::Nullterm(str.value.clone()),
+            )),
             _ => todo!("implement other expressions"),
         }
     }

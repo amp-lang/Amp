@@ -1,3 +1,6 @@
-const Test = func Test(): i32 {
-    return 42;
+const Printf = func printf(&u8): i32;
+
+const Main = func main(): i32 {
+    Printf("Hello, world!");
+    return 0;
 };
