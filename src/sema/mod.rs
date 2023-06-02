@@ -22,8 +22,8 @@ use crate::{
     codemap::{Span, Spanned},
     diag::SemaDiagnostics,
     syntax::ast,
-    types::{FuncSig, Type},
-    value::Value,
+    types::{FuncSig, Mutable, Type},
+    value::{FuncId, Value},
     Context,
 };
 
@@ -35,7 +35,24 @@ use self::scope::{Scope, ScopedRef};
 #[derive(Debug)]
 pub struct Unit {
     /// The constants declared in this [Unit].
+    ///
+    /// Past the semantic analysis phase, all uses of `const` declarations are inlined, for
+    /// example:
+    /// ```amp
+    /// const MyValue = 42;
+    /// var my_value = MyValue * 2;
+    /// ```
+    ///
+    /// Becomes:
+    /// ```amp
+    /// var my_value = 42 * 2;
+    /// ```
+    ///
+    /// This means that this list can be discarded as it is not used by the next phases.
     pub consts: SlotArena<Const>,
+
+    /// The functions declared in this [Unit].
+    pub funcs: SlotArena<air::Func>,
 }
 
 impl Unit {
@@ -44,6 +61,7 @@ impl Unit {
     pub fn new() -> Self {
         Self {
             consts: SlotArena::new(),
+            funcs: SlotArena::new(),
         }
     }
 
@@ -198,12 +216,13 @@ impl<'root> Module<'root> {
                                 .expect("TODO: uninit not implemented")
                         };
 
+                        println!("coerce `intermediate` to its type");
                         let expr = intermediate
                             .coerce(&ty)
                             .expect("TODO: report `const` type mismatch");
 
                         unit.consts.get_mut(const_id).value =
-                            Some((ty, Value::eval(expr).expect("TODO: report this")))
+                            Some((ty, Value::eval(expr).expect("TODO: report this")));
                     }
                 }
                 _ => todo!("throw error when invalid items are found"),
@@ -243,6 +262,9 @@ pub enum IntermediateExpr {
 
     /// Any compile time known value with a known type.
     Const(Type, Value),
+
+    /// A reference value, such as a type or a reference.
+    Ref(Mutable, Box<IntermediateExpr>),
 }
 
 impl IntermediateExpr {
@@ -274,17 +296,43 @@ impl IntermediateExpr {
             }
             ast::Expr::Int(int) => Ok(Self::ImmInt(int.value)),
             ast::Expr::Func(func) => {
+                let sig = FuncSig::from_ast(cx, unit, scope, &func)?;
+
                 if func.name.is_none() && func.block.is_none() {
                     // it's a function type, rather than a function value.
                     Ok(Self::Const(
                         Type::Type,
-                        Value::Type(Type::Func(Box::new(FuncSig::from_ast(
-                            cx, unit, scope, &func,
-                        )?))),
+                        Value::Type(Type::Func(Box::new(sig))),
                     ))
                 } else {
-                    todo!("implement function values")
+                    let extern_name = func.name.as_ref().map(|name| name.value.clone());
+
+                    // TODO: check if there is a function with the same external name, verify that
+                    // the function was not already defined and that the two signatures are
+                    // equivalent to eachother.
+
+                    let func_value = air::Func { extern_name };
+                    let func_ref = unit.funcs.insert(func_value);
+
+                    Ok(Self::Const(
+                        Type::Func(Box::new(sig)),
+                        Value::Func(FuncId(func_ref.to_raw())),
+                    ))
                 }
+            }
+            ast::Expr::Unary(box ast::Unary { op, operand, .. })
+                if *op == ast::UnaryOp::Ref || *op == ast::UnaryOp::RefMut =>
+            {
+                let mutable = if *op == ast::UnaryOp::Ref {
+                    Mutable::No
+                } else {
+                    Mutable::Yes
+                };
+
+                Ok(Self::Ref(
+                    mutable,
+                    Box::new(IntermediateExpr::verify(cx, unit, scope, operand)?),
+                ))
             }
             _ => todo!("implement other expressions"),
         }
@@ -292,6 +340,9 @@ impl IntermediateExpr {
 
     /// Attempts to coerce the [IntermediateExpr] into the provided type.
     pub fn coerce(self, expected_type: &Type) -> Option<air::Expr> {
+        println!("enter `coerce`");
+        println!("expected: {:?}", expected_type);
+        println!("got: {:?}", self);
         match (self, expected_type) {
             (Self::ImmInt(value), expected_type) if expected_type.is_int() => {
                 // TODO: possibly move to separate method
@@ -307,6 +358,18 @@ impl IntermediateExpr {
             }
             (Self::Const(ty, value), expected_type) if ty.is_equivalent(&expected_type) => {
                 Some(air::Expr::Const(ty, value))
+            }
+            (Self::Ref(mutable, operand), expected_type)
+                if expected_type.is_equivalent(&Type::Type) =>
+            {
+                let Value::Type(operand_type) = Value::eval(operand.coerce(&Type::Type)?)
+                .expect("TODO: throw diagnostic that type is not constant")
+                else { unreachable!("should be a type") };
+
+                Some(air::Expr::Const(
+                    Type::Type,
+                    Value::Type(Type::thin_ptr(mutable, operand_type)),
+                ))
             }
             _ => None,
         }
@@ -337,6 +400,14 @@ impl IntermediateExpr {
             // TODO: pick a type other than i32 if the literal type is too large.
             Self::ImmInt(_) => Some(Type::I32), // use `i32` as default type for integers
             Self::Const(ty, _) => Some(ty.clone()),
+            Self::Ref(mutable, operand) => {
+                // TODO: do we need to confirm that there is a default type?
+                if operand.default_type()? == Type::Type {
+                    Some(Type::Type)
+                } else {
+                    Some(Type::thin_ptr(*mutable, operand.default_type()?))
+                }
+            }
         }
     }
 }

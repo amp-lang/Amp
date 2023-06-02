@@ -2,6 +2,8 @@
 //!
 //! Provides the capabilities to compile Amp programs without accessing the command line.
 
+#![feature(box_patterns)]
+
 pub mod codemap;
 mod context;
 pub mod diag;

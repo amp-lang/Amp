@@ -23,7 +23,7 @@ impl ThinPtr {
     /// equivalent to `&mut T`.
     #[inline]
     pub fn is_equivalent(&self, other: &ThinPtr) -> bool {
-        self.0 >= other.0 && self.is_equivalent(other)
+        self.0 >= other.0 && self.1.is_equivalent(&other.1)
     }
 }
 
