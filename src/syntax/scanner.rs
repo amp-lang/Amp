@@ -177,8 +177,6 @@ impl<'cx, 'src> Scanner<'cx, 'src> {
     /// Skips all skippable tokens (whitespace, comments) until a non-skippable character is found.
     /// Should be called before [next_span](#method.next_span), as leading whitespace should not be
     /// included in a token's span.
-    ///
-    /// TODO: scan for comments
     fn skip(&mut self) {
         while let Some(token) = self.peek_char() {
             if token.is_whitespace() {
