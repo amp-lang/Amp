@@ -37,23 +37,21 @@ fn main() -> ExitCode {
         }
     };
 
-    let mut unit = sema::Unit::new();
-    {
+    let unit = sema::Unit::new();
+    let air = {
         let res = unit.analyze(&mut cx, ast);
 
         cx.emit().unwrap();
 
         match res {
-            Ok(_) => {}
+            Ok(value) => value,
             Err(_) => return ExitCode::FAILURE,
         }
     };
 
-    println!(
-        "Finished in {}ms",
-        start_time.elapsed().as_nanos() as f64 / 1_000_000f64
-    );
-    dbg!(unit);
+    let elapsed = start_time.elapsed().as_nanos() as f64 / 1_000_000f64;
+    dbg!(air);
+    println!("Finished in {}ms", elapsed);
 
     ExitCode::SUCCESS
 }

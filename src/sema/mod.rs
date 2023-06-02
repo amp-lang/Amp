@@ -28,7 +28,7 @@ use crate::{
 };
 
 use self::{
-    air::Stmnt,
+    air::{Air, Stmnt},
     scope::{Scope, ScopedRef},
 };
 
@@ -116,17 +116,17 @@ impl Unit {
     /// Analyzes the provided module, lowering it to AIR.
     ///
     /// Should only be called once per [Unit].  TODO: return the produced AIR.
-    pub fn analyze(&mut self, cx: &mut Context, source: ast::Stmnts) -> Result<(), ()> {
+    pub fn analyze(mut self, cx: &mut Context, source: ast::Stmnts) -> Result<Air, ()> {
         let mut global_scope = Scope::new();
         self.initialize_scope_with_primitives(&mut global_scope);
 
         let mut module = Module::new(source);
         module.scope_mut().parent(Some(&global_scope));
 
-        module.declare_root_const_names(cx, self)?;
-        module.define_root_const_values(cx, self)?;
+        module.declare_root_const_names(cx, &mut self)?;
+        module.define_root_const_values(cx, &mut self)?;
 
-        Ok(())
+        Ok(Air { funcs: self.funcs })
     }
 
     /// Analyzes the provided statement, converting it into AIR.

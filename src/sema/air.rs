@@ -1,3 +1,5 @@
+use slot_arena::SlotArena;
+
 use crate::{
     syntax::ast,
     types::{FuncSig, Type},
@@ -6,6 +8,13 @@ use crate::{
 };
 
 use super::{scope::Scope, IntermediateExpr, Unit};
+
+/// An AIR unit, which stores the entire compilation unit's AIR code.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Air {
+    /// The functions declared in the unit.
+    pub funcs: SlotArena<Func>,
+}
 
 /// A typed AIR expression.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
