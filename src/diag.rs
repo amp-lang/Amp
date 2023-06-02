@@ -295,6 +295,22 @@ pub trait SemaDiagnostics: Report {
             .note("values cannot be used in a type's position", None);
         self.report(diag);
     }
+
+    /// Reports that a `const` declaration had a mismatched value.
+    ///
+    /// # Params
+    /// 1. The name of the expected type.
+    /// 1. The name of the found type.
+    /// 2. The span of the mismatched value.
+    fn const_decl_type_mismatch(
+        &mut self,
+        expected_type: &str,
+        got_type: &str,
+        offending_span: Span,
+    ) {
+        let diag = self.type_mismatch_base(expected_type, got_type, offending_span);
+        self.report(diag);
+    }
 }
 
 impl<T: Report> SemaDiagnostics for T {}

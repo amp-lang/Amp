@@ -302,9 +302,16 @@ impl<'root> Module<'root> {
                                 .expect("TODO: uninit not implemented")
                         };
 
-                        let expr = intermediate
-                            .coerce(&ty)
-                            .expect("TODO: report `const` type mismatch");
+                        let expr = intermediate.clone().coerce(&ty).ok_or_else(|| {
+                            cx.const_decl_type_mismatch(
+                                &ty.name(),
+                                &intermediate
+                                    .default_type()
+                                    .expect("must have default type")
+                                    .name(),
+                                decl.value.span(),
+                            )
+                        })?;
 
                         unit.consts.get_mut(const_id).value =
                             Some((ty, Value::eval(expr).expect("TODO: report this")));
