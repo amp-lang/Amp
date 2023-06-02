@@ -216,7 +216,6 @@ impl<'root> Module<'root> {
                                 .expect("TODO: uninit not implemented")
                         };
 
-                        println!("coerce `intermediate` to its type");
                         let expr = intermediate
                             .coerce(&ty)
                             .expect("TODO: report `const` type mismatch");
@@ -340,9 +339,6 @@ impl IntermediateExpr {
 
     /// Attempts to coerce the [IntermediateExpr] into the provided type.
     pub fn coerce(self, expected_type: &Type) -> Option<air::Expr> {
-        println!("enter `coerce`");
-        println!("expected: {:?}", expected_type);
-        println!("got: {:?}", self);
         match (self, expected_type) {
             (Self::ImmInt(value), expected_type) if expected_type.is_int() => {
                 // TODO: possibly move to separate method
