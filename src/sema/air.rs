@@ -21,6 +21,9 @@ pub struct Air {
 pub enum Expr {
     /// Any value known at compile time.
     Const(Type, Value),
+
+    /// A function call expression.  The provided type is the type that the function call outputs.
+    Call(Type, Box<Call>),
 }
 
 /// The implementation of a [Func], if it is defined.
@@ -94,6 +97,16 @@ impl Return {
     }
 }
 
+/// A function call expression in AIR.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Call {
+    /// The function being called.
+    pub callee: Expr,
+
+    /// The parameters of the function.
+    pub params: Vec<Expr>,
+}
+
 /// A statement in Amp AIR.
 ///
 /// Statements are instructions of code that are used as a base for an operation, such as
@@ -102,4 +115,5 @@ impl Return {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Stmnt {
     Return(Return),
+    Call(Call),
 }

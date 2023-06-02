@@ -132,9 +132,30 @@ impl<Module: cranelift_module::Module> ClifBackend<Module> {
                         .ins()
                         .iconst(cranelift::types::I32, *value as i64),
                 ),
+                Value::Nullterm(value) => {
+                    // TODO: move to separate function
+                    let mut str = value.clone();
+                    str.push('\0');
+
+                    let mut clif_data_context = cranelift::DataContext::new();
+                    clif_data_context.define(str.into_bytes().into_boxed_slice());
+
+                    let data_id = self.module.declare_anonymous_data(true, false).unwrap();
+                    self.module
+                        .define_data(data_id, &clif_data_context)
+                        .unwrap();
+
+                    let clif_global_value =
+                        self.module.declare_data_in_func(data_id, clif_builder.func);
+                    Some(clif_builder.ins().global_value(
+                        self.module.target_config().pointer_type(),
+                        clif_global_value,
+                    ))
+                }
                 // TODO: functions as values
                 _ => None,
             },
+            _ => todo!("lower function calls"),
         }
     }
 
@@ -152,6 +173,31 @@ impl<Module: cranelift_module::Module> ClifBackend<Module> {
                 };
 
                 clif_builder.ins().return_(&values);
+            }
+            air::Stmnt::Call(call) => {
+                // TODO: move call lowering to separate function.
+                let mut values = Vec::new();
+
+                for value in &call.params {
+                    values.push(
+                        self.lower_expr(clif_builder, value)
+                            .expect("should be a valid cranelift supported value"),
+                    );
+                }
+
+                match &call.callee {
+                    air::Expr::Const(_, value) => match value {
+                        Value::Func(id) => {
+                            let clif_func_id = self.clif_func_map.get(id).unwrap().id;
+                            let clif_func_ref = self
+                                .module
+                                .declare_func_in_func(clif_func_id, clif_builder.func);
+                            clif_builder.ins().call(clif_func_ref, &values)
+                        }
+                        _ => unreachable!("no other constant values can be used as functions"),
+                    },
+                    _ => todo!("function as values (indirect function calls)"),
+                };
             }
         }
     }

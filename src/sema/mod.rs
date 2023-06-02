@@ -140,6 +140,7 @@ impl Unit {
             ast::Expr::Return(expr) => Ok(air::Stmnt::Return(air::Return::from_ast(
                 cx, self, scope, expr,
             )?)),
+            ast::Expr::Call(expr) => Ok(air::Stmnt::Call(self.analyze_call(cx, scope, expr)?.1)),
             _ => todo!("report expressions that aren't supported as statements"),
         }
     }
@@ -161,6 +162,48 @@ impl Unit {
         }
 
         Ok(stmnts)
+    }
+
+    pub fn analyze_call(
+        &mut self,
+        cx: &mut Context,
+        scope: &Scope,
+        call: &ast::Call,
+    ) -> Result<(Type, air::Call), ()> {
+        let callee = IntermediateExpr::verify(cx, self, scope, &call.callee)?;
+
+        match callee
+            .default_type()
+            .expect("TODO: don't expect default type")
+        {
+            Type::Func(func_sig) => {
+                assert_eq!(
+                    func_sig.params.len(),
+                    call.args.items.len(),
+                    "TODO: report arglist length mismatch"
+                );
+
+                let mut params = Vec::new();
+
+                for (idx, arg) in call.args.items.iter().enumerate() {
+                    let ty = &func_sig.params[idx];
+                    let value = IntermediateExpr::verify(cx, self, scope, arg)?
+                        .coerce(ty)
+                        .expect("TODO: report argument type mismatch");
+
+                    params.push(value);
+                }
+
+                Ok((
+                    func_sig.returns.clone(),
+                    air::Call {
+                        callee: callee.infer().expect("should have a default type"),
+                        params,
+                    },
+                ))
+            }
+            _ => todo!("report non-function call"),
+        }
     }
 }
 
@@ -307,6 +350,9 @@ pub enum IntermediateExpr {
 
     /// A reference value, such as a type or a reference.
     Ref(Mutable, Box<IntermediateExpr>),
+
+    /// A function call expression.  The provided type is the type that the function outputs.
+    Call(Type, air::Call),
 }
 
 impl IntermediateExpr {
@@ -337,6 +383,10 @@ impl IntermediateExpr {
                 }
             }
             ast::Expr::Int(int) => Ok(Self::ImmInt(int.value)),
+            ast::Expr::Str(str) => Ok(Self::Const(
+                Type::thin_ptr(Mutable::Yes, Type::U8),
+                Value::Nullterm(str.value.clone()),
+            )),
             ast::Expr::Func(func) => {
                 let sig = FuncSig::from_ast(cx, unit, scope, &func)?;
 
@@ -386,10 +436,10 @@ impl IntermediateExpr {
                     Box::new(IntermediateExpr::verify(cx, unit, scope, operand)?),
                 ))
             }
-            ast::Expr::Str(str) => Ok(Self::Const(
-                Type::thin_ptr(Mutable::Yes, Type::U8),
-                Value::Nullterm(str.value.clone()),
-            )),
+            ast::Expr::Call(call) => {
+                todo!("function calls");
+                // Ok(Self::Call(unit.analyze_call(cx, scope, call)?))
+            }
             _ => todo!("implement other expressions"),
         }
     }
@@ -423,6 +473,9 @@ impl IntermediateExpr {
                     Type::Type,
                     Value::Type(Type::thin_ptr(mutable, operand_type)),
                 ))
+            }
+            (Self::Call(ty, call), expected_type) if ty.is_equivalent(expected_type) => {
+                Some(air::Expr::Call(ty, Box::new(call)))
             }
             _ => None,
         }
@@ -461,6 +514,7 @@ impl IntermediateExpr {
                     Some(Type::thin_ptr(*mutable, operand.default_type()?))
                 }
             }
+            Self::Call(ty, _) => Some(ty.clone()),
         }
     }
 }

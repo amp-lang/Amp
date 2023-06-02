@@ -43,6 +43,8 @@ impl Value {
     pub fn eval(expr: air::Expr) -> Option<Self> {
         match expr {
             air::Expr::Const(_, value) => Some(value),
+            // Not supported as const expression
+            _ => None,
         }
     }
 }
