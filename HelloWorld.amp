@@ -1,5 +1,7 @@
 const MyNumber = 42;
 
 const Main = func(): i32 {
-    MyNumber();
+    // MyNumber();
 };
+
+const MyValue = Main();

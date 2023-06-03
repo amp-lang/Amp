@@ -366,6 +366,17 @@ pub trait SemaDiagnostics: Report {
             Some(offending_span),
         ))
     }
+
+    /// Reports that a runtime value was used when a constant value was expected.
+    ///
+    /// # Params
+    /// 1. The span of the offending runtime value.
+    fn value_not_known_at_compile_time(&mut self, offending_span: Span) {
+        self.report(Diag::new().error(
+            "this value is not known at compile time",
+            Some(offending_span),
+        ))
+    }
 }
 
 impl<T: Report> SemaDiagnostics for T {}

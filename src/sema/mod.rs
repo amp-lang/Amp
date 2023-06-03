@@ -322,8 +322,12 @@ impl<'root> Module<'root> {
                             )
                         })?;
 
-                        unit.consts.get_mut(const_id).value =
-                            Some((ty, Value::eval(expr).expect("TODO: report this")));
+                        unit.consts.get_mut(const_id).value = Some((
+                            ty,
+                            Value::eval(expr).ok_or_else(|| {
+                                cx.value_not_known_at_compile_time(decl.value.span())
+                            })?,
+                        ));
                     }
                 }
                 _ => todo!("throw error when invalid items are found"),
