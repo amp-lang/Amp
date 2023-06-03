@@ -158,7 +158,7 @@ impl Type {
                 expr.span()
             ))?
         })
-        .expect("TODO: types can only be constant")
+        .expect("constant evaluation cannot fail as types are always constant")
         else { 
             unreachable!("value should be of type `type` as verified above")
         };

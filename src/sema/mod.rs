@@ -115,7 +115,7 @@ impl Unit {
 
     /// Analyzes the provided module, lowering it to AIR.
     ///
-    /// Should only be called once per [Unit].  TODO: return the produced AIR.
+    /// Should only be called once per [Unit].
     pub fn analyze(mut self, cx: &mut Context, source: ast::Stmnts) -> Result<Air, ()> {
         let mut global_scope = Scope::new();
         self.initialize_scope_with_primitives(&mut global_scope);
@@ -171,17 +171,23 @@ impl Unit {
         call: &ast::Call,
     ) -> Result<(Type, air::Call), ()> {
         let callee = IntermediateExpr::verify(cx, self, scope, &call.callee)?;
-
-        match callee
+        let callee_type = callee
             .default_type()
-            .expect("TODO: don't expect default type")
-        {
+            .expect("TODO: don't expect default type when values like `uninit` exist");
+
+        match &callee_type {
             Type::Func(func_sig) => {
-                assert_eq!(
-                    func_sig.params.len(),
-                    call.args.items.len(),
-                    "TODO: report arglist length mismatch"
-                );
+                let expected_len = func_sig.params.len();
+                let got_len = call.args.items.len();
+                if expected_len != got_len {
+                    cx.function_call_argument_length_mismatch(
+                        expected_len,
+                        got_len,
+                        &callee_type.name(),
+                        call.span(),
+                    );
+                    return Err(());
+                }
 
                 let mut params = Vec::new();
 

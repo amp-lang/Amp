@@ -330,6 +330,30 @@ pub trait SemaDiagnostics: Report {
 
         self.report(diag.note("return must match function's signature", None));
     }
+
+    /// Reports that a function call was invalid for the provided argument length.
+    ///
+    /// # Params
+    /// 1. The expected number of arguments.
+    /// 2. The number of arguments found.
+    /// 3. The type of the callee (the function being called).
+    /// 4. The span of the call expression.
+    fn function_call_argument_length_mismatch(
+        &mut self,
+        expected: usize,
+        got: usize,
+        callee_type: &str,
+        offending_span: Span,
+    ) {
+        self.report(
+            Diag::new()
+                .error(
+                    format!("expected {} argument(s), got {}", expected, got),
+                    Some(offending_span),
+                )
+                .note(format!("callee is of type `{}`", callee_type), None),
+        )
+    }
 }
 
 impl<T: Report> SemaDiagnostics for T {}

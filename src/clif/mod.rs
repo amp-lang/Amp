@@ -119,7 +119,6 @@ impl<Module: cranelift_module::Module> ClifBackend<Module> {
         clif_builder: &mut cranelift::FunctionBuilder,
         call: &air::Call,
     ) -> cranelift::codegen::ir::Inst {
-        // TODO: move call lowering to separate function.
         let mut values = Vec::new();
 
         for value in &call.params {
@@ -251,7 +250,6 @@ impl<Module: cranelift_module::Module> ClifBackend<Module> {
             }
             .unwrap();
 
-            // TODO: store signature information, etc.
             self.clif_func_map.insert(
                 FuncId(id.to_raw()),
                 ClifFunc {

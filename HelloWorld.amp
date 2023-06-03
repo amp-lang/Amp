@@ -1,9 +1,5 @@
-const GetHelloWorld = func(): &u8 {
-    return "Hello!";
-};
-
 const Printf = func printf(&u8): i32;
 
-const Main = func main(): i32 {
-    Printf(GetHelloWorld());
+const Main = func(): i32 {
+    Printf("Hello, world! %d", 42);
 };
