@@ -113,6 +113,37 @@ impl<Module: cranelift_module::Module> ClifBackend<Module> {
         }
     }
 
+    /// Lowers the provided function call statement, returning the produced instruction.
+    fn lower_func_call(
+        &mut self,
+        clif_builder: &mut cranelift::FunctionBuilder,
+        call: &air::Call,
+    ) -> cranelift::codegen::ir::Inst {
+        // TODO: move call lowering to separate function.
+        let mut values = Vec::new();
+
+        for value in &call.params {
+            values.push(
+                self.lower_expr(clif_builder, value)
+                    .expect("should be a valid cranelift supported value"),
+            );
+        }
+
+        match &call.callee {
+            air::Expr::Const(_, value) => match value {
+                Value::Func(id) => {
+                    let clif_func_id = self.clif_func_map.get(id).unwrap().id;
+                    let clif_func_ref = self
+                        .module
+                        .declare_func_in_func(clif_func_id, clif_builder.func);
+                    clif_builder.ins().call(clif_func_ref, &values)
+                }
+                _ => unreachable!("no other constant values can be used as functions"),
+            },
+            _ => todo!("function as values (indirect function calls)"),
+        }
+    }
+
     /// Attempts to lower an expression into Cranelift IR.  Returns the value produced by the
     /// expression if it was successfully converted into Cranelift IR.
     fn lower_expr(
@@ -155,7 +186,10 @@ impl<Module: cranelift_module::Module> ClifBackend<Module> {
                 // TODO: functions as values
                 _ => None,
             },
-            _ => todo!("lower function call expression"),
+            air::Expr::Call(_, call) => {
+                let inst = self.lower_func_call(clif_builder, call);
+                Some(clif_builder.inst_results(inst)[0])
+            }
         }
     }
 
@@ -175,29 +209,7 @@ impl<Module: cranelift_module::Module> ClifBackend<Module> {
                 clif_builder.ins().return_(&values);
             }
             air::Stmnt::Call(call) => {
-                // TODO: move call lowering to separate function.
-                let mut values = Vec::new();
-
-                for value in &call.params {
-                    values.push(
-                        self.lower_expr(clif_builder, value)
-                            .expect("should be a valid cranelift supported value"),
-                    );
-                }
-
-                match &call.callee {
-                    air::Expr::Const(_, value) => match value {
-                        Value::Func(id) => {
-                            let clif_func_id = self.clif_func_map.get(id).unwrap().id;
-                            let clif_func_ref = self
-                                .module
-                                .declare_func_in_func(clif_func_id, clif_builder.func);
-                            clif_builder.ins().call(clif_func_ref, &values)
-                        }
-                        _ => unreachable!("no other constant values can be used as functions"),
-                    },
-                    _ => todo!("function as values (indirect function calls)"),
-                };
+                self.lower_func_call(clif_builder, call);
             }
         }
     }
