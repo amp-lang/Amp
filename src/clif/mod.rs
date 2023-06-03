@@ -193,8 +193,13 @@ impl<Module: cranelift_module::Module> ClifBackend<Module> {
         }
     }
 
-    /// Lowers an AIR statement into Cranelift IR.
-    fn lower_stmnt(&mut self, clif_builder: &mut cranelift::FunctionBuilder, stmnt: &air::Stmnt) {
+    /// Lowers an AIR statement into Cranelift IR.  Returns `true` if the instruction terminates
+    /// and the compiler can skip the implicit return.
+    fn lower_stmnt(
+        &mut self,
+        clif_builder: &mut cranelift::FunctionBuilder,
+        stmnt: &air::Stmnt,
+    ) -> bool {
         match stmnt {
             air::Stmnt::Return(ret) => {
                 let mut values = Vec::new();
@@ -207,22 +212,26 @@ impl<Module: cranelift_module::Module> ClifBackend<Module> {
                 };
 
                 clif_builder.ins().return_(&values);
+                true
             }
             air::Stmnt::Call(call) => {
                 self.lower_func_call(clif_builder, call);
+                false
             }
         }
     }
 
-    /// Lowers a code block into Cranelift IR.
+    /// Lowers a code block into Cranelift IR.  Returns `true` if the block terminated by itself.
     fn lower_block(
         &mut self,
         clif_builder: &mut cranelift::FunctionBuilder,
         stmnts: &Vec<air::Stmnt>,
-    ) {
+    ) -> bool {
+        let mut terminates = false;
         for stmnt in stmnts {
-            self.lower_stmnt(clif_builder, stmnt);
+            terminates = self.lower_stmnt(clif_builder, stmnt) || terminates;
         }
+        terminates
     }
 
     /// Lowers the provided AIR unit into the Cranelift module that the [ClifBackend] was
@@ -275,7 +284,27 @@ impl<Module: cranelift_module::Module> ClifBackend<Module> {
                     clif_builder.append_block_params_for_function_params(entry_block);
                     clif_builder.switch_to_block(entry_block);
                 }
-                self.lower_block(&mut clif_builder, &def.insts);
+
+                if !self.lower_block(&mut clif_builder, &def.insts) {
+                    // implicit return
+                    match &func.signature.returns {
+                        ty if ty.is_int() => {
+                            let default = clif_builder.ins().iconst(
+                                self.lower_type(ty)
+                                    .expect("function must return cranelift compatible type"),
+                                0,
+                            );
+                            clif_builder.ins().return_(&[default]);
+                        }
+                        Type::Func(_) | Type::ThinPtr(_) => {
+                            let default = clif_builder
+                                .ins()
+                                .iconst(self.module.target_config().pointer_type(), 0);
+                            clif_builder.ins().return_(&[default]);
+                        }
+                        _ => unreachable!("function cannot return invalid type"),
+                    }
+                }
 
                 clif_builder.seal_all_blocks();
                 clif_builder.finalize();

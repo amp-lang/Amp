@@ -6,5 +6,4 @@ const Printf = func printf(&u8): i32;
 
 const Main = func main(): i32 {
     Printf(GetHelloWorld());
-    return 0;
 };
