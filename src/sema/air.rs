@@ -1,6 +1,8 @@
 use slot_arena::SlotArena;
 
 use crate::{
+    codemap::{Span, Spanned},
+    diag::SemaDiagnostics,
     syntax::ast,
     types::{FuncSig, Type},
     value::Value,
@@ -38,6 +40,10 @@ pub struct FuncDef {
 pub struct Func {
     /// The type signature of the function.
     pub signature: FuncSig,
+
+    /// The span of the function's signature, if applicable.  This is the span from the `func`
+    /// keyword to the end of the return type.
+    pub signature_span: Option<Span>,
 
     /// The name that will be exposed to the linkage unit when the modules are being linked.  If
     /// no name is provided, the function will be anonymous and only accessible in the object file
@@ -81,15 +87,25 @@ impl Return {
         scope: &mut Scope,
         stmnt: &ast::Return,
     ) -> Result<Self, ()> {
-        let expected_return_type = unit.funcs.get(unit.current_func).signature.returns.clone();
+        let (signature_span, expected_return_type) = {
+            let func = unit.funcs.get(unit.current_func);
+            (func.signature_span, func.signature.returns.clone())
+        };
 
         // TODO: check if void
         let value = match &stmnt.value {
-            Some(value) => Some(
-                IntermediateExpr::verify(cx, unit, scope, value)?
-                    .coerce(&expected_return_type)
-                    .expect("TODO: report error here"),
-            ),
+            Some(value) => Some({
+                let expr = IntermediateExpr::verify(cx, unit, scope, value)?;
+
+                expr.clone().coerce(&expected_return_type).ok_or_else(|| {
+                    cx.return_type_mismatch(
+                        &expected_return_type.name(),
+                        &expr.default_type().expect("must have a type").name(),
+                        value.span(),
+                        signature_span,
+                    )
+                })?
+            }),
             None => None,
         };
 

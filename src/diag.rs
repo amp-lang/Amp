@@ -296,20 +296,39 @@ pub trait SemaDiagnostics: Report {
         self.report(diag);
     }
 
-    /// Reports that a `const` declaration had a mismatched value.
+    /// Reports that a general type mismatch was found.
     ///
     /// # Params
     /// 1. The name of the expected type.
-    /// 1. The name of the found type.
-    /// 2. The span of the mismatched value.
-    fn const_decl_type_mismatch(
+    /// 2. The name of the found type.
+    /// 3. The span of the mismatched value.
+    fn type_mismatch(&mut self, expected_type: &str, got_type: &str, offending_span: Span) {
+        let diag = self.type_mismatch_base(expected_type, got_type, offending_span);
+        self.report(diag);
+    }
+
+    /// Reports that a type mismatch was found in a return statement.
+    ///
+    /// # Params
+    /// 1. The name of the expected type.
+    /// 2. The name of the found type.
+    /// 3. The span of the mismatched value.
+    /// 4. The span of the function signature, if applicable (from the `func` keyword to the end
+    ///    of the return type).
+    fn return_type_mismatch(
         &mut self,
         expected_type: &str,
         got_type: &str,
         offending_span: Span,
+        signature_span: Option<Span>,
     ) {
-        let diag = self.type_mismatch_base(expected_type, got_type, offending_span);
-        self.report(diag);
+        let mut diag = self.type_mismatch_base(expected_type, got_type, offending_span);
+
+        if let Some(span) = signature_span {
+            diag = diag.note("function signature declared here", Some(span));
+        }
+
+        self.report(diag.note("return must match function's signature", None));
     }
 }
 

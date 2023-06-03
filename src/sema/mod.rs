@@ -303,7 +303,7 @@ impl<'root> Module<'root> {
                         };
 
                         let expr = intermediate.clone().coerce(&ty).ok_or_else(|| {
-                            cx.const_decl_type_mismatch(
+                            cx.type_mismatch(
                                 &ty.name(),
                                 &intermediate
                                     .default_type()
@@ -412,6 +412,11 @@ impl IntermediateExpr {
 
                     let func_value = air::Func {
                         signature: sig.clone(),
+                        signature_span: Some(Span::new(
+                            func.span().file_id(),
+                            func.span().start(),
+                            func.returns.span().end(),
+                        )),
                         extern_name,
                         def: None,
                     };
