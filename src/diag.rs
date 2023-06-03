@@ -354,6 +354,18 @@ pub trait SemaDiagnostics: Report {
                 .note(format!("callee is of type `{}`", callee_type), None),
         )
     }
+
+    /// Reports that an attempt was made to call a non-function value.
+    ///
+    /// # Params
+    /// 1. The name of the invalid callee's type.
+    /// 2. The span of the function call expression.
+    fn calling_non_function_type(&mut self, got_type: &str, offending_span: Span) {
+        self.report(Diag::new().error(
+            format!("attempt to call non-function type `{}`", got_type),
+            Some(offending_span),
+        ))
+    }
 }
 
 impl<T: Report> SemaDiagnostics for T {}

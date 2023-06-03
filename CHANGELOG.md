@@ -7,6 +7,7 @@
 - [Implement implicit returns](https://github.com/amp-lang/ampc/issues/6)
 - Report diagnostic instead of panicking for mismatched return types
 - Report diagnostic for function argument number length mismatches
+- Report diagnostic for attempting to call non-function values
 
 ### [`snapshot-02-06-2023-a`](https://github.com/amp-lang/ampc/releases/tag/snapshot-02-06-2023-a)
 (initial snapshot)

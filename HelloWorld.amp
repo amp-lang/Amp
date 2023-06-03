@@ -1,5 +1,5 @@
-const Printf = func printf(&u8): i32;
+const MyNumber = 42;
 
 const Main = func(): i32 {
-    Printf("Hello, world! %d", 42);
+    MyNumber();
 };

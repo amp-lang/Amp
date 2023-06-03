@@ -208,7 +208,10 @@ impl Unit {
                     },
                 ))
             }
-            _ => todo!("report non-function call"),
+            _ => {
+                cx.calling_non_function_type(&callee_type.name(), call.span());
+                Err(())
+            }
         }
     }
 }
