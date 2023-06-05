@@ -339,9 +339,10 @@ pub trait SemaDiagnostics: Report {
         callee_type: &str,
         offending_span: Span,
     ) {
-        let mut diag = self.type_mismatch_base(expected_type, got_type, offending_span);
-
-        self.report(diag.note(format!("arguments must match `{}`", callee_type), None));
+        let diag = self
+            .type_mismatch_base(expected_type, got_type, offending_span)
+            .note(format!("arguments must match `{}`", callee_type), None);
+        self.report(diag);
     }
 
     /// Reports that a function call was invalid for the provided argument length.
