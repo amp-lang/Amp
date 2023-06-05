@@ -332,6 +332,12 @@ pub trait SemaDiagnostics: Report {
     }
 
     /// Reports that an invalid argument was found.
+    ///
+    /// # Params
+    /// 1. The name of the type that was expected.
+    /// 2. The name of the type which was found.
+    /// 3. The type of the called function.
+    /// 4. The span of the invalid argument.
     fn function_argument_type_mismatch(
         &mut self,
         expected_type: &str,
@@ -390,6 +396,30 @@ pub trait SemaDiagnostics: Report {
             "this value is not known at compile time",
             Some(offending_span),
         ))
+    }
+
+    /// Reports that an invalid statement was found at the root of a module.
+    ///
+    /// # Params
+    /// 1. The span of the invalid statement.
+    fn invalid_statement_at_root(&mut self, offending_span: Span) {
+        self.report(Diag::new().error("invalid statement at root of module", Some(offending_span)))
+    }
+
+    /// Reports that an invalid statement was found.
+    ///
+    /// # Params
+    /// 1. The span of the invalid statement.
+    fn invalid_statement(&mut self, offending_span: Span) {
+        self.report(Diag::new().error("invalid statement", Some(offending_span)))
+    }
+
+    /// Reports that an invalid expression was found.
+    ///
+    /// # Params
+    /// 1. The span of the invalid expression.
+    fn invalid_expression(&mut self, offending_span: Span) {
+        self.report(Diag::new().error("invalid expression", Some(offending_span)))
     }
 }
 

@@ -141,7 +141,10 @@ impl Unit {
                 cx, self, scope, expr,
             )?)),
             ast::Expr::Call(expr) => Ok(air::Stmnt::Call(self.analyze_call(cx, scope, expr)?.1)),
-            _ => todo!("report expressions that aren't supported as statements"),
+            _ => {
+                cx.invalid_statement(stmnt.span());
+                Err(())
+            }
         }
     }
 
@@ -287,7 +290,10 @@ impl<'root> Module<'root> {
                         self.scope.insert(&decl.name.value, ScopedRef::Const(id));
                     }
                 }
-                _ => todo!("throw error when invalid items are found"),
+                _ => {
+                    cx.invalid_statement_at_root(item.span());
+                    return Err(());
+                }
             }
         }
 
@@ -341,7 +347,7 @@ impl<'root> Module<'root> {
                         ));
                     }
                 }
-                _ => todo!("throw error when invalid items are found"),
+                _ => unreachable!("invalid values have been reported in previous pass"),
             }
         }
 
@@ -476,7 +482,10 @@ impl IntermediateExpr {
                 let res = unit.analyze_call(cx, scope, call)?;
                 Ok(Self::Call(res.0, res.1))
             }
-            _ => todo!("report invalid expressions"),
+            _ => {
+                cx.invalid_expression(expr.span());
+                Err(())
+            }
         }
     }
 
