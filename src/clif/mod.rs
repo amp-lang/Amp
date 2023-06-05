@@ -307,16 +307,17 @@ impl<Module: cranelift_module::Module> ClifBackend<Module> {
                 clif_builder.seal_all_blocks();
                 clif_builder.finalize();
 
+                // TODO: add toggle for printing Cranelift IR
                 // Print the Cranelift IR of the function.
-                println!(
-                    "{}{}",
-                    if let Some(name) = &func.extern_name {
-                        format!("({}): ", name)
-                    } else {
-                        "".to_string()
-                    },
-                    clif_func.display()
-                );
+                // println!(
+                //     "{}{}",
+                //     if let Some(name) = &func.extern_name {
+                //         format!("({}): ", name)
+                //     } else {
+                //         "".to_string()
+                //     },
+                //     clif_func.display()
+                // );
 
                 clif_context.func = clif_func;
                 self.module

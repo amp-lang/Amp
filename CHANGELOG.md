@@ -9,6 +9,7 @@
 - Report diagnostic for function argument number length mismatches
 - Report diagnostic for attempting to call non-function values
 - [Report `const` declarations with values not known at compile time](https://github.com/amp-lang/ampc/issues/9)
+- Report diagnostic for mismatched function arguments
 
 ### [`snapshot-02-06-2023-a`](https://github.com/amp-lang/ampc/releases/tag/snapshot-02-06-2023-a)
 (initial snapshot)

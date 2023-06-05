@@ -1,7 +1,6 @@
-const MyNumber = 42;
+const Printf = func printf(&u8): i32;
 
 const Main = func(): i32 {
-    // MyNumber();
+    Printf(42);
+    return 0;
 };
-
-const MyValue = Main();

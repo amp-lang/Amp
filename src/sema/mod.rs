@@ -193,9 +193,20 @@ impl Unit {
 
                 for (idx, arg) in call.args.items.iter().enumerate() {
                     let ty = &func_sig.params[idx];
-                    let value = IntermediateExpr::verify(cx, self, scope, arg)?
-                        .coerce(ty)
-                        .expect("TODO: report argument type mismatch");
+
+                    let middle = IntermediateExpr::verify(cx, self, scope, arg)?;
+
+                    let value = middle.clone().coerce(ty).ok_or_else(|| {
+                        cx.function_argument_type_mismatch(
+                            &ty.name(),
+                            &middle
+                                .default_type()
+                                .expect("uninit isn't implemented yet")
+                                .name(),
+                            &callee_type.name(),
+                            arg.span(),
+                        )
+                    })?;
 
                     params.push(value);
                 }
@@ -465,7 +476,7 @@ impl IntermediateExpr {
                 let res = unit.analyze_call(cx, scope, call)?;
                 Ok(Self::Call(res.0, res.1))
             }
-            _ => todo!("implement other expressions"),
+            _ => todo!("report invalid expressions"),
         }
     }
 
@@ -491,7 +502,7 @@ impl IntermediateExpr {
                 if expected_type.is_equivalent(&Type::Type) =>
             {
                 let Value::Type(operand_type) = Value::eval(operand.coerce(&Type::Type)?)
-                .expect("TODO: throw diagnostic that type is not constant")
+                .expect("types are always constant")
                 else { unreachable!("should be a type") };
 
                 Some(air::Expr::Const(
@@ -532,7 +543,6 @@ impl IntermediateExpr {
             Self::ImmInt(_) => Some(Type::I32), // use `i32` as default type for integers
             Self::Const(ty, _) => Some(ty.clone()),
             Self::Ref(mutable, operand) => {
-                // TODO: do we need to confirm that there is a default type?
                 if operand.default_type()? == Type::Type {
                     Some(Type::Type)
                 } else {

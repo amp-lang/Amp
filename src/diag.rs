@@ -331,6 +331,19 @@ pub trait SemaDiagnostics: Report {
         self.report(diag.note("return must match function's signature", None));
     }
 
+    /// Reports that an invalid argument was found.
+    fn function_argument_type_mismatch(
+        &mut self,
+        expected_type: &str,
+        got_type: &str,
+        callee_type: &str,
+        offending_span: Span,
+    ) {
+        let mut diag = self.type_mismatch_base(expected_type, got_type, offending_span);
+
+        self.report(diag.note(format!("arguments must match `{}`", callee_type), None));
+    }
+
     /// Reports that a function call was invalid for the provided argument length.
     ///
     /// # Params
