@@ -1,7 +1,7 @@
 # Changelog
 
-# [Unreleased Changes]
-## [`snapshot-05-06-2023-a`](https://github.com/amp-lang/ampc/releases/tag/snapshot-05-06-2023-a)
+## [Unreleased Changes]
+### [`snapshot-05-06-2023-a`](https://github.com/amp-lang/ampc/releases/tag/snapshot-05-06-2023-a)
 - [Report diagnostics in `Type::from_ast`](https://github.com/amp-lang/ampc/issues/5) (report invalid types)
 - Report type mismatches in `const` declarations
 - [Implement using function calls as values](https://github.com/amp-lang/ampc/issues/8)
