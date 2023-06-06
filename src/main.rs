@@ -2,59 +2,98 @@ use std::{process::ExitCode, time::Instant};
 
 use ampc::{
     clif::compile_air_to_obj_file,
+    diag::Diag,
     sema,
     syntax::{self, ast::Stmnts},
     Context,
 };
+use clap::Parser;
+use cli::{BuildObj, Command};
 
-fn main() -> ExitCode {
+pub mod cli;
+
+/// Builds an object file.
+fn build_obj(cx: &mut Context, args: BuildObj) -> Result<(), ()> {
     let start_time = Instant::now();
-    let mut cx = Context::new();
     let file_id = cx.add_file(
-        "HelloWorld.amp",
-        std::fs::read_to_string("HelloWorld.amp").unwrap(),
+        &args.root,
+        match std::fs::read_to_string(&args.root) {
+            Ok(value) => value,
+            Err(_) => {
+                cx.report(
+                    Diag::new().error(format!("cannot open source file '{}'", &args.root), None),
+                );
+                return Err(());
+            }
+        },
     );
 
     let source = cx.files().get(file_id).unwrap().source().to_owned();
     let tokens = {
-        let res = syntax::scan(&mut cx, file_id, &source);
+        let res = syntax::scan(cx, file_id, &source);
 
         cx.emit().unwrap();
 
         match res {
             Ok(value) => value,
-            Err(_) => return ExitCode::FAILURE,
+            Err(_) => return Err(()),
         }
     };
 
     let ast = {
-        let res = Stmnts::parse(&mut cx, &mut tokens.iter());
+        let res = Stmnts::parse(cx, &mut tokens.iter());
 
         cx.emit().unwrap();
 
         match res {
             Ok(value) => value,
-            Err(_) => return ExitCode::FAILURE,
+            Err(_) => return Err(()),
         }
     };
 
     let unit = sema::Unit::new();
     let air = {
-        let res = unit.analyze(&mut cx, ast);
+        let res = unit.analyze(cx, ast);
 
         cx.emit().unwrap();
 
         match res {
             Ok(value) => value,
-            Err(_) => return ExitCode::FAILURE,
+            Err(_) => return Err(()),
         }
     };
 
     let obj = compile_air_to_obj_file(air);
-    std::fs::write("HelloWorld.o", obj).unwrap();
+    match std::fs::write(&args.output_path, obj) {
+        Ok(_) => {}
+        Err(_) => {
+            cx.report(Diag::new().error(
+                format!("cannot write output file '{}'", &args.output_path),
+                None,
+            ));
+            return Err(());
+        }
+    }
 
     let elapsed = start_time.elapsed().as_nanos() as f64 / 1_000_000f64;
     println!("Finished in {}ms", elapsed);
+    Ok(())
+}
 
-    ExitCode::SUCCESS
+fn main() -> ExitCode {
+    // execute subcommand
+    let cmd = Command::parse();
+    let mut cx = Context::new();
+    let mut res = ExitCode::SUCCESS;
+
+    match cmd {
+        Command::BuildObj(args) => match build_obj(&mut cx, args) {
+            Err(_) => res = ExitCode::FAILURE,
+            _ => {}
+        },
+        Command::Version => println!("Amp Compiler v{}", env!("CARGO_PKG_VERSION")),
+    }
+
+    cx.emit().unwrap();
+    res
 }

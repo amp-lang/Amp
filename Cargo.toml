@@ -8,6 +8,7 @@ edition = "2021"
 name = "ampc"
 
 [dependencies]
+clap = { version = "4.2.1", features = ["derive"] }
 codespan-reporting = { path = "./codespan-reporting" }
 cranelift = "0.94.0"
 cranelift-module = "0.94.0"
