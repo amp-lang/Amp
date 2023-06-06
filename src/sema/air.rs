@@ -101,12 +101,20 @@ impl Return {
                     cx.return_type_mismatch(
                         &expected_return_type.name(),
                         &expr.default_type().expect("must have a type").name(),
-                        value.span(),
+                        stmnt.span(),
                         signature_span,
                     )
                 })?
             }),
-            None => None,
+            None => {
+                cx.return_type_mismatch(
+                    &expected_return_type.name(),
+                    "void",
+                    stmnt.span(),
+                    signature_span,
+                );
+                return Err(());
+            }
         };
 
         Ok(Self { value })
