@@ -29,39 +29,12 @@ fn build_obj(cx: &mut Context, args: BuildObj) -> Result<(), ()> {
     );
 
     let source = cx.files().get(file_id).unwrap().source().to_owned();
-    let tokens = {
-        let res = syntax::scan(cx, file_id, &source);
+    let tokens = syntax::scan(cx, file_id, &source)?;
 
-        cx.emit().unwrap();
-
-        match res {
-            Ok(value) => value,
-            Err(_) => return Err(()),
-        }
-    };
-
-    let ast = {
-        let res = Stmnts::parse(cx, &mut tokens.iter());
-
-        cx.emit().unwrap();
-
-        match res {
-            Ok(value) => value,
-            Err(_) => return Err(()),
-        }
-    };
+    let ast = Stmnts::parse(cx, &mut tokens.iter()).map_err(|_| ())?;
 
     let unit = sema::Unit::new();
-    let air = {
-        let res = unit.analyze(cx, ast);
-
-        cx.emit().unwrap();
-
-        match res {
-            Ok(value) => value,
-            Err(_) => return Err(()),
-        }
-    };
+    let air = unit.analyze(cx, ast)?;
 
     let obj = compile_air_to_obj_file(air);
     match std::fs::write(&args.output_path, obj) {
