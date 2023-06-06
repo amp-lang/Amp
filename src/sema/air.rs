@@ -28,6 +28,15 @@ pub enum Expr {
     Call(Type, Box<Call>),
 }
 
+impl Expr {
+    pub fn type_of(&self) -> Type {
+        match self {
+            Self::Const(ty, _) => ty.clone(),
+            Self::Call(ty, _) => ty.clone(),
+        }
+    }
+}
+
 /// The implementation of a [Func], if it is defined.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FuncDef {

@@ -107,6 +107,7 @@ impl<Module: cranelift_module::Module> ClifBackend<Module> {
             Type::U8 => Some(cranelift::types::I8),
             Type::I32 => Some(cranelift::types::I32),
             Type::ThinPtr(_) => Some(self.module.target_config().pointer_type()),
+            Type::Func(_) => Some(self.module.target_config().pointer_type()),
 
             // Cannot map the Amp type to a Cranelift type.
             _ => None,
@@ -139,7 +140,22 @@ impl<Module: cranelift_module::Module> ClifBackend<Module> {
                 }
                 _ => unreachable!("no other constant values can be used as functions"),
             },
-            _ => todo!("function as values (indirect function calls)"),
+            expr => {
+                let Type::Func(sig) = expr.type_of() else {
+                    unreachable!("SEMA confirms that this is a valid function")
+                };
+
+                let clif_callee = self
+                    .lower_expr(clif_builder, expr)
+                    .expect("must be a valid callable function value");
+
+                let clif_sig = self.lower_func_sig(&sig).expect("must be valid signature");
+                let clif_sig_ref = clif_builder.import_signature(clif_sig);
+
+                clif_builder
+                    .ins()
+                    .call_indirect(clif_sig_ref, clif_callee, &values)
+            }
         }
     }
 
@@ -181,6 +197,17 @@ impl<Module: cranelift_module::Module> ClifBackend<Module> {
                         self.module.target_config().pointer_type(),
                         clif_global_value,
                     ))
+                }
+                Value::Func(func_id) => {
+                    let clif_func_id = self.clif_func_map.get(func_id).unwrap().id;
+                    let clif_func_ref = self
+                        .module
+                        .declare_func_in_func(clif_func_id, clif_builder.func);
+                    Some(
+                        clif_builder
+                            .ins()
+                            .func_addr(self.module.target_config().pointer_type(), clif_func_ref),
+                    )
                 }
                 // TODO: functions as values
                 _ => None,

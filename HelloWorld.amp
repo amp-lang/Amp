@@ -1,6 +1,15 @@
+const GetStrSig = func(): &u8;
+const GetStr: GetStrSig = func(): &u8 {
+    return "Hello, indirect calls!";
+};
+
+const GetGetStr = func(): GetStrSig {
+    return GetStr;
+};
+
 const Printf = func printf(&u8): i32;
 
 const Main = func main(): i32 {
-    Printf("Hello, world!");
-    return;
+    Printf(GetGetStr()());
+    return 0;
 };
