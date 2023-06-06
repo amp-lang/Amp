@@ -1,5 +1,7 @@
 # Changelog
 
+## [Unreleased Changes]
+
 ## `v0.5.0-alpha`
 - [Parse command line arguments](https://github.com/amp-lang/ampc/issues/11)
 - [Disable returning types from functions entirely](https://github.com/amp-lang/ampc/issues/10)
