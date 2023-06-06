@@ -1,7 +1,10 @@
 use crate::{
-    sema::{scope::Scope, Unit, IntermediateExpr},
+    codemap::{Span, Spanned},
+    diag::SemaDiagnostics,
+    sema::{scope::Scope, IntermediateExpr, Unit},
     syntax::ast,
-    Context, value::Value, diag::SemaDiagnostics, codemap::Spanned,
+    value::Value,
+    Context,
 };
 
 /// The mutability of a pointer.
@@ -28,7 +31,11 @@ impl ThinPtr {
 
     /// Returns the name of the [ThinPtr] type.
     pub fn name(&self) -> String {
-        format!("&{}{}", if self.0 == Mutable::Yes { "mut " } else { "" }, self.1.name())
+        format!(
+            "&{}{}",
+            if self.0 == Mutable::Yes { "mut " } else { "" },
+            self.1.name()
+        )
     }
 }
 
@@ -59,10 +66,36 @@ impl FuncSig {
     /// Returns the name of this type.
     pub fn name(&self) -> String {
         format!(
-            "func({}): {}", 
-            self.params.iter().map(|item| item.name()).collect::<Vec<_>>().join(", "),
+            "func({}): {}",
+            self.params
+                .iter()
+                .map(|item| item.name())
+                .collect::<Vec<_>>()
+                .join(", "),
             self.returns.name()
         )
+    }
+
+    /// Reports a diagnostic if the provided type cannot be used as a function argument.
+    fn check_arg_validity(cx: &mut Context, span: Span, arg: Type) -> Result<Type, ()> {
+        match arg {
+            Type::Type => {
+                cx.cannot_use_type_as_argument(span);
+                Err(())
+            }
+            arg => Ok(arg),
+        }
+    }
+
+    /// Reports a diagnostic if the provided type cannot be used as a return type for a function.
+    fn check_return_validity(cx: &mut Context, span: Span, arg: Type) -> Result<Type, ()> {
+        match arg {
+            Type::Type => {
+                cx.cannot_use_type_as_return(span);
+                Err(())
+            }
+            arg => Ok(arg),
+        }
     }
 
     /// Attempts to get the signature of a function from an AST expression.
@@ -76,14 +109,23 @@ impl FuncSig {
 
         for arg in &expr.args.items {
             params.push(match arg {
-                ast::FuncParam::Anon(arg) => Type::from_ast(cx, unit, scope, &arg)?,
-                ast::FuncParam::Named(ast::NamedParam { ty, .. }) => Type::from_ast(cx, unit, scope, &ty.ty)?,
+                ast::FuncParam::Anon(arg) => {
+                    let ty = Type::from_ast(cx, unit, scope, &arg)?;
+                    Self::check_arg_validity(cx, arg.span(), ty)?
+                }
+                ast::FuncParam::Named(ast::NamedParam { ty, .. }) => {
+                    let ty = Type::from_ast(cx, unit, scope, &ty.ty)?;
+                    Self::check_arg_validity(cx, arg.span(), ty)?
+                }
             });
         }
 
         Ok(Self {
             params,
-            returns: Type::from_ast(cx, unit, scope, &expr.returns.ty)?,
+            returns: {
+                let ty = Type::from_ast(cx, unit, scope, &expr.returns.ty)?;
+                Self::check_return_validity(cx, expr.returns.ty.span(), ty)?
+            },
         })
     }
 }
@@ -149,7 +191,7 @@ impl Type {
     ) -> Result<Self, ()> {
         let Value::Type(final_ty) = Value::eval({
             let value = IntermediateExpr::verify(cx, unit, scope, expr)?;
-            
+
             value.clone()
             // verify that the value is a type
             .coerce(&Type::Type)
@@ -159,7 +201,7 @@ impl Type {
             ))?
         })
         .expect("constant evaluation cannot fail as types are always constant")
-        else { 
+        else {
             unreachable!("value should be of type `type` as verified above")
         };
 

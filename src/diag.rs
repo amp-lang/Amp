@@ -421,6 +421,28 @@ pub trait SemaDiagnostics: Report {
     fn invalid_expression(&mut self, offending_span: Span) {
         self.report(Diag::new().error("invalid expression", Some(offending_span)))
     }
+
+    /// Reports that a `type` cannot be recieved from an argument.
+    ///
+    /// # Params
+    /// 1. The span of the invalid argument.
+    fn cannot_use_type_as_argument(&mut self, offending_span: Span) {
+        self.report(Diag::new().error(
+            "functions cannot recieve `type`s as arguments",
+            Some(offending_span),
+        ))
+    }
+
+    /// Reports that a `type` cannot be outputted as a return value.
+    ///
+    /// # Params
+    /// 1. The span of the invalid return type.
+    fn cannot_use_type_as_return(&mut self, offending_span: Span) {
+        self.report(Diag::new().error(
+            "functions cannot output `type`s as return values",
+            Some(offending_span),
+        ))
+    }
 }
 
 impl<T: Report> SemaDiagnostics for T {}
