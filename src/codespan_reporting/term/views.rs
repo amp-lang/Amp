@@ -1,9 +1,11 @@
 use std::ops::Range;
 
-use crate::diagnostic::{Diagnostic, LabelStyle};
-use crate::files::{Error, Files, Location};
-use crate::term::renderer::{Locus, MultiLabel, Renderer, SingleLabel};
-use crate::term::Config;
+use crate::codespan_reporting;
+
+use codespan_reporting::diagnostic::{Diagnostic, LabelStyle};
+use codespan_reporting::files::{Error, Files, Location};
+use codespan_reporting::term::renderer::{Locus, MultiLabel, Renderer, SingleLabel};
+use codespan_reporting::term::Config;
 
 /// Calculate the number of decimal digits in `n`.
 // TODO: simplify after https://github.com/rust-lang/rust/issues/70887 resolves

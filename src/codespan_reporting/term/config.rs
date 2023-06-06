@@ -1,6 +1,7 @@
 use termcolor::{Color, ColorSpec};
 
-use crate::diagnostic::{LabelStyle, Severity};
+use crate::codespan_reporting;
+use codespan_reporting::diagnostic::{LabelStyle, Severity};
 
 /// Configures how a diagnostic is rendered.
 #[derive(Clone, Debug)]

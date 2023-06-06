@@ -2,9 +2,11 @@ use std::io::{self, Write};
 use std::ops::Range;
 use termcolor::{Color, ColorSpec, WriteColor};
 
-use crate::diagnostic::{LabelStyle, Severity};
-use crate::files::{Error, Location};
-use crate::term::{Chars, Config, Styles};
+use crate::codespan_reporting;
+
+use codespan_reporting::diagnostic::{LabelStyle, Severity};
+use codespan_reporting::files::{Error, Location};
+use codespan_reporting::term::{Chars, Config, Styles};
 
 /// The 'location focus' of a source code snippet.
 pub struct Locus {

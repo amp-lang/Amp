@@ -6,6 +6,7 @@
 
 pub mod clif;
 pub mod codemap;
+pub(crate) mod codespan_reporting;
 mod context;
 pub mod diag;
 pub mod sema;

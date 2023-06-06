@@ -3,8 +3,9 @@
 use std::str::FromStr;
 use termcolor::{ColorChoice, WriteColor};
 
-use crate::diagnostic::Diagnostic;
-use crate::files::Files;
+use crate::codespan_reporting;
+use codespan_reporting::diagnostic::Diagnostic;
+use codespan_reporting::files::Files;
 
 mod config;
 mod renderer;
@@ -105,8 +106,8 @@ pub fn emit<'files, F: Files<'files>>(
 mod tests {
     use super::*;
 
-    use crate::diagnostic::Label;
-    use crate::files::SimpleFiles;
+    use codespan_reporting::diagnostic::Label;
+    use codespan_reporting::files::SimpleFiles;
 
     #[test]
     fn unsized_emit() {

@@ -1,5 +1,6 @@
 use std::io::Write;
 
+use crate::codespan_reporting;
 use codespan_reporting::{
     diagnostic::{Diagnostic, Label, Severity},
     files::SimpleFiles,
